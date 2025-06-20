@@ -1,0 +1,31 @@
+version: '3.9'
+services:
+  api:
+    build: .
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=ml-inference-api
+    depends_on:
+      - db
+      - jaeger
+    ports:
+      - "8000:8000"
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC
+  tempo:
+    image: grafana/tempo:latest
+    command: ["--config.file=/etc/tempo.yml"]
+    volumes:
+      - ./tempo.yml:/etc/tempo.yml
+    ports:
+      - "3200:3200"
+    profiles: ["tempo"]
