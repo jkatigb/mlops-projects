@@ -1,0 +1,17 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: iris-model
+spec:
+  hosts:
+    - iris-model
+  http:
+    - route:
+        - destination:
+            host: iris-model
+            subset: v1
+          weight: 90
+        - destination:
+            host: iris-model
+            subset: v2
+          weight: 10

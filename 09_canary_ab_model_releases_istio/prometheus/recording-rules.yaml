@@ -1,0 +1,12 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: iris-model-rules
+spec:
+  groups:
+    - name: iris.rules
+      rules:
+        - record: iris_latency_seconds
+          expr: histogram_quantile(0.99, sum(rate(request_latency_seconds_bucket{job="iris-model"}[5m])) by (le))
+        - record: iris_request_count
+          expr: sum(rate(request_total{job="iris-model"}[1m]))

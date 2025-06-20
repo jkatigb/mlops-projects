@@ -1,0 +1,21 @@
+{
+  "dashboard": {
+    "title": "Iris Rollout",
+    "panels": [
+      {
+        "type": "graph",
+        "title": "Latency P99",
+        "targets": [
+          {"expr": "iris_latency_seconds"}
+        ]
+      },
+      {
+        "type": "graph",
+        "title": "Request Volume",
+        "targets": [
+          {"expr": "iris_request_count"}
+        ]
+      }
+    ]
+  }
+}

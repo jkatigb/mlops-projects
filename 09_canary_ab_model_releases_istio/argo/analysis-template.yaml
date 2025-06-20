@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: iris-success-rate
+spec:
+  args:
+    - name: service-name
+  metrics:
+    - name: success-rate
+      interval: 1m
+      count: 3
+      successCondition: result[0] >= 0.95
+      provider:
+        prometheus:
+          address: http://prometheus.istio-system:9090
+          query: |
+            sum(rate(iris_request_count{service="{{args.service-name}}",status_code=~"2.."}[1m]))
+            /
+            sum(rate(iris_request_count{service="{{args.service-name}}"}[1m]))
