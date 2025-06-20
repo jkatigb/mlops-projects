@@ -1,0 +1,19 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8sblockpubliclb
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sBlockPublicLB
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sblockpubliclb
+
+        violation[{"msg": msg}] {
+          input.review.object.spec.type == "LoadBalancer"
+          not input.review.object.spec.loadBalancerIP
+          msg := "Service of type LoadBalancer must not be publicly accessible"
+        }

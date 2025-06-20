@@ -1,0 +1,9 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sBlockPublicLB
+metadata:
+  name: block-public-lb
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Service"]

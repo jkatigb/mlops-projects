@@ -1,0 +1,31 @@
+name: Trivy Scan
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.9.2
+        with:
+          scan-type: fs
+          ignore-unfixed: true
+          format: table
+          severity: CRITICAL,HIGH
+      - name: Run Trivy config scan
+        uses: aquasecurity/trivy-action@v0.9.2
+        with:
+          scan-type: config
+          exit-code: 1
+          severity: CRITICAL,HIGH
+      - name: Slack notify on failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: 'Policy violation detected by Trivy'
