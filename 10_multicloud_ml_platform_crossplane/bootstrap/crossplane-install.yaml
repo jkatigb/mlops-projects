@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crossplane-system
+---
+apiVersion: helm.crossplane.io/v1beta1
+kind: Release
+metadata:
+  name: crossplane
+  namespace: crossplane-system
+spec:
+  chart:
+    repository: https://charts.crossplane.io/stable
+    name: crossplane
+    version: 1.14.0
+  namespace: crossplane-system
+  install:
+    remediation:
+      retries: 3

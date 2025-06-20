@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: inference-service
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - cluster: prod-us
+            url: https://kubernetes.default.svc
+          - cluster: prod-eu
+            url: https://kubernetes.default.svc
+  template:
+    metadata:
+      name: '{{cluster}}-inference'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/orbis/mlops-projects.git
+        targetRevision: HEAD
+        path: 13_reusable_helm_chart_model_serving/chart
+      destination:
+        server: '{{url}}'
+        namespace: inference
+      syncPolicy:
+        automated: {}

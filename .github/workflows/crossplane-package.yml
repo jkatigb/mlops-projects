@@ -1,0 +1,22 @@
+name: crossplane-packages
+
+on:
+  push:
+    paths:
+      - '10_multicloud_ml_platform_crossplane/**'
+      - '.github/workflows/crossplane-package.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Crossplane CLI
+        run: |
+          curl -sL https://raw.githubusercontent.com/crossplane/crossplane/master/install.sh | sh
+      - name: Build packages
+        run: kubectl crossplane build configuration ./10_multicloud_ml_platform_crossplane
+      - name: Push packages
+        env:
+          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+        run: kubectl crossplane push configuration xpkg.upbound.io/myorg/platform:latest

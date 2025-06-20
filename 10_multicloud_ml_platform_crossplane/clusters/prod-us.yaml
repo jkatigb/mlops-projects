@@ -1,0 +1,9 @@
+apiVersion: platform.orbis.dev/v1alpha1
+kind: Cluster
+metadata:
+  name: prod-us
+spec:
+  compositionRef:
+    name: standard-xcluster
+  parameters:
+    region: us-east-1
