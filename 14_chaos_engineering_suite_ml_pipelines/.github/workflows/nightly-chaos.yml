@@ -10,17 +10,54 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+      
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+      
+      - name: Validate cluster access
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+      
+      - name: Check LitmusChaos installation
+        run: |
+          kubectl get pods -n chaos || echo "Chaos namespace not found"
+      
       - name: Apply chaos experiments
         run: |
+          echo "Starting chaos experiments..."
           kubectl apply -f experiments/pod-delete.yaml
-          kubectl apply -f experiments/aws-s3-object-corruption.yaml
+          sleep 10
           kubectl apply -f experiments/network-latency.yaml
-      - name: Wait for completion
+          # Only run S3 experiment if AWS secret exists
+          kubectl get secret aws-secret -n chaos && kubectl apply -f experiments/aws-s3-object-corruption.yaml || echo "Skipping S3 experiment - no AWS secret found"
+      
+      - name: Monitor experiments
         run: |
-          sleep 300
-          kubectl get chaosresults -n chaos
-      - name: Cleanup engines
+          echo "Waiting for experiments to run..."
+          for i in {1..30}; do
+            echo "Check $i/30..."
+            kubectl get chaosengine,chaosresults -n chaos
+            sleep 10
+          done
+      
+      - name: Collect results
+        if: always()
         run: |
-          kubectl delete chaosengine --all -n chaos
+          echo "=== Chaos Engine Status ==="
+          kubectl get chaosengine -n chaos -o yaml
+          echo "=== Chaos Results ==="
+          kubectl get chaosresults -n chaos -o yaml
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up chaos experiments..."
+          kubectl delete chaosengine --all -n chaos || true

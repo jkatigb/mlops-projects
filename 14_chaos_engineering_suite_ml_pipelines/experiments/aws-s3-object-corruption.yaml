@@ -17,9 +17,19 @@ spec:
           env:
             - name: BUCKET_NAME
               value: "ml-bucket"
-            - name: ACCESS_KEY
-              value: "YOUR_ACCESS_KEY"
-            - name: SECRET_KEY
-              value: "YOUR_SECRET_KEY"
+            - name: OBJECT_PREFIX
+              value: "training-data/"
+            - name: PERCENTAGE
+              value: "10"
             - name: REGION
               value: "us-east-1"
+            - name: ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: access_key
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: secret_key
