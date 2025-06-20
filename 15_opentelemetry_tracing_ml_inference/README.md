@@ -24,10 +24,39 @@ Latency spikes are hard to debug without request-level visibility. Tracing pinpo
 
 ## Quick Run
 ```bash
+# Start all services
 docker compose up --build
-curl -X POST localhost:8000/predict -d '{"feature": 1.2}'
-open http://localhost:16686  # Jaeger UI
+
+# Test the API
+curl -X POST localhost:8000/predict -H "Content-Type: application/json" -d '{"feature": 1.2}'
+
+# Health check
+curl localhost:8000/health
+
+# View traces in Jaeger UI
+open http://localhost:16686
+
+# Generate load for testing
+python load_test.py --url http://localhost:8000
 ```
 
+## Using Tempo Instead of Jaeger
+```bash
+# Run with Tempo profile
+docker compose --profile tempo up --build
+
+# Tempo API is available at http://localhost:3200
+```
+
+## Viewing Traces
+1. Open Jaeger UI at http://localhost:16686
+2. Select "ml-inference-api" from the Service dropdown
+3. Click "Find Traces"
+4. Click on any trace to see the waterfall view showing:
+   - API request handling
+   - Database query execution
+   - External HTTP call
+   - Model inference timing
+
 ---
-*Status*: draft
+*Status*: ready
