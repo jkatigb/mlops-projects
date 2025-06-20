@@ -1,0 +1,48 @@
+hub:
+  extraEnv:
+    JUPYTERHUB_CRYPT_KEY: "changeme"
+  image:
+    name: jupyterhub/k8s-hub
+    tag: 3.1.0
+  extraConfig:
+    auth:
+      authenticator_class: oauthenticator.generic.GenericOAuthenticator
+      GenericOAuthenticator:
+        client_id: jhub
+        client_secret: CHANGEME
+        token_url: https://auth.example.com/oauth/token
+        userdata_url: https://auth.example.com/userinfo
+        scope:
+          - openid
+          - profile
+        tls_verify: true
+
+singleuser:
+  defaultUrl: "/lab"
+  extraAnnotations:
+    iam.amazonaws.com/role: "{{ .Values.singleuser.awsRole }}"
+  profileList:
+    - display_name: "Small CPU"
+      slug: cpu-small
+      kubespawner_override:
+        image: python:3.11
+        cpu_limit: 1
+        mem_limit: 2G
+    - display_name: "GPU"
+      slug: gpu
+      kubespawner_override:
+        image: pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
+        cpu_limit: 4
+        mem_limit: 16G
+        extra_resource_limits:
+          nvidia.com/gpu: 1
+  cull:
+    enabled: true
+    every: 300
+    timeout: 1800
+
+prePuller:
+  hook:
+    enabled: true
+
+

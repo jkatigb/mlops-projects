@@ -1,0 +1,16 @@
+{
+  "title": "JupyterHub Users vs Nodes",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Active Users",
+      "targets": [{ "expr": "sum(jupyterhub_users)" }]
+    },
+    {
+      "type": "graph",
+      "title": "Node Utilisation",
+      "targets": [{ "expr": "avg(node_cpu_seconds_total{mode!='idle'})" }]
+    }
+  ]
+}
+

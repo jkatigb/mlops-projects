@@ -1,36 +1,34 @@
 # Self-Service JupyterHub on EKS
 
 ## Overview
-Deploys JupyterHub via Helm on AWS EKS with per-user IAM roles and idle-cull automation. DS teams get secure, cost-controlled notebooks that integrate with existing S3 data lakes.
+Deploys JupyterHub via Helm on AWS EKS with per-user IAM roles and idle-culling. Data scientists get secure notebooks backed by S3 and GPU/CPU profiles.
 
 ## Why it matters
 Unmanaged notebooks consume GPUs and leak credentials. Providing a governed, ephemeral environment boosts productivity while slashing infra waste.
 
 ## Tech Stack
 * AWS EKS + IAM Roles for ServiceAccounts (IRSA)
+* Terraform modules for VPC, EKS and IAM
 * JupyterHub Helm chart (Zero to JupyterHub)
 * Karpenter optional for autoscaling nodes
-* Idle-cull & resource quotas
-* Terraform for infra
+* Prometheus + Grafana for metrics
 
-## Task Checklist
-- [ ] Terraform: VPC, EKS, OIDC provider, IAM policies for S3  
-- [ ] Helm values:
-  - [ ] SingleUser profile with GPU & CPU options  
-  - [ ] HUB image with LDAP/OIDC auth (Cognito or Okta)  
-  - [ ] Idle culler >30 min inactivity  
-- [ ] IRSA annotations for per-user S3 access  
-- [ ] Pre-configured Conda environments via `repo2docker`  
-- [ ] Docs: how to add new environment via Git PR  
-- [ ] Grafana dashboard: active users vs. node utilisation  
-- [ ] Cost guardrails: PodDisruptionBudget & shutdown window  
+## Contents
+* `terraform/` – infrastructure modules
+* `helm/values.yaml` – JupyterHub configuration
+* `examples/repo2docker/` – sample environments
+* `docs/` – how-to guides
 
 ## Quick Demo
 ```bash
-make infra-up
-helm upgrade --install jhub jupyterhub/jupyterhub -f helm/values.yaml
-open https://jupyter.$DOMAIN  # login with test@orbis.dev
+cd terraform && terraform init && terraform apply -auto-approve
+helm repo add jupyterhub https://jupyterhub.github.io/helm-chart/
+helm upgrade --install jhub jupyterhub/jupyterhub -n jhub \
+  --create-namespace -f ../helm/values.yaml
 ```
 
+After a few minutes open the ELB URL and authenticate.
+
 ---
-*Status*: skeleton 
+*Status*: alpha
+
