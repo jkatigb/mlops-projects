@@ -1,8 +1,10 @@
+import os
 from feast import FeatureStore
 
 
 def main():
-    store = FeatureStore(repo_path=".")
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    store = FeatureStore(repo_path=repo_dir)
     features = store.get_online_features(
         features=[
             "driver_stats:conv_rate",

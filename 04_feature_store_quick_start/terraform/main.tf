@@ -13,7 +13,20 @@ provider "aws" {
 
 resource "aws_s3_bucket" "offline_store" {
   bucket        = var.s3_bucket_name
-  force_destroy = true
+  force_destroy = var.enable_force_destroy
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "offline_store" {
+  bucket = aws_s3_bucket.offline_store.id
+
+  rule {
+    id     = "delete-old-features"
+    status = "Enabled"
+
+    expiration {
+      days = 90
+    }
+  }
 }
 
 resource "aws_dynamodb_table" "online_store" {
@@ -25,12 +38,8 @@ resource "aws_dynamodb_table" "online_store" {
     name = "feature_id"
     type = "S"
   }
-}
-
-output "s3_bucket" {
-  value = aws_s3_bucket.offline_store.id
-}
-
-output "dynamodb_table" {
-  value = aws_dynamodb_table.online_store.id
+  
+  point_in_time_recovery {
+    enabled = true
+  }
 }

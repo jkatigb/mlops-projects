@@ -3,3 +3,10 @@ __pycache__/
 *.parquet
 .env
 .env.*
+!.env.example
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars

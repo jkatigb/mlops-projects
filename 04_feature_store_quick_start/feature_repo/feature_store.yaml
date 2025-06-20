@@ -5,3 +5,4 @@ online_store:
   type: redis
 offline_store:
   type: file
+  path: data/offline_store
