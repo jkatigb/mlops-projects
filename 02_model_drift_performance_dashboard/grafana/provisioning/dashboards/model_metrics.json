@@ -1,0 +1,28 @@
+{
+  "title": "Model Metrics",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "p95 Latency",
+      "targets": [
+        {"expr": "histogram_quantile(0.95, rate(request_duration_seconds_bucket[1m]))"}
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Drift Score",
+      "targets": [
+        {"expr": "model_drift_score"}
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Error Rate",
+      "targets": [
+        {"expr": "rate(requests_total{status!='200'}[1m])"}
+      ]
+    }
+  ],
+  "schemaVersion": 16,
+  "version": 1
+}

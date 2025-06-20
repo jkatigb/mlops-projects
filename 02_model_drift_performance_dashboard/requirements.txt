@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+prometheus_fastapi_instrumentator
+requests
+evidently
+pandas
+prometheus_client

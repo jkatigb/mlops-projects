@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+      - name: api
+        image: model-drift-api:latest
+        ports:
+        - containerPort: 8000
+      - name: drift-monitor
+        image: model-drift-monitor:latest
+        ports:
+        - containerPort: 8001
