@@ -38,6 +38,10 @@ provider "helm" {
   }
 }
 
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "5.1.0"
@@ -118,9 +122,5 @@ resource "helm_release" "karpenter" {
     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
     value = aws_iam_role.karpenter_controller.arn
   }
-}
-
-output "cluster_name" {
-  value = module.eks.cluster_name
 }
 

@@ -13,6 +13,13 @@ spec:
         resources:
           limits:
             nvidia.com/gpu: 1
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
       tolerations:
       - key: nvidia.com/gpu
         operator: Exists

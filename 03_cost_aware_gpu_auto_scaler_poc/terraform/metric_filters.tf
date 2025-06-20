@@ -1,6 +1,11 @@
 resource "aws_cloudwatch_log_group" "eks" {
-  name = "/aws/eks/${module.eks.cluster_name}/cluster"
+  name              = "/aws/eks/${module.eks.cluster_name}/cluster"
   retention_in_days = 7
+  
+  tags = {
+    Environment = "poc"
+    Team        = "ml-platform"
+  }
 }
 
 resource "aws_cloudwatch_metric_filter" "gpu_cost" {

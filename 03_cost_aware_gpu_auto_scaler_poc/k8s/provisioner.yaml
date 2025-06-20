@@ -13,6 +13,7 @@ spec:
   limits:
     resources:
       cpu: 1000
+      memory: 2048Gi
   providerRef:
     name: default
   ttlSecondsAfterEmpty: 60
