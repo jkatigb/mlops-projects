@@ -1,6 +1,10 @@
 # MLOps Projects
 
-This repository collects a series of small MLOps prototypes and templates. Each folder is a standalone subproject. See the table below for a short description and current status. Click on any project name to view its README for full details.
+This repository collects a series of small MLOps prototypes and templates. Each folder is a standalone subproject demonstrating specific MLOps patterns, tools, and best practices. 
+
+## Overview
+
+See the table below for a short description and current status. Click on any project name to view its README for full details.
 
 | Project | Purpose | Status |
 |---|---|---|
@@ -18,5 +22,17 @@ This repository collects a series of small MLOps prototypes and templates. Each 
 | [12_realtime_feature_pipeline_kafka_flink_feast](12_realtime_feature_pipeline_kafka_flink_feast/README.md) | Streams sensor data through Kafka and Flink into Feast for sub-10 ms feature retrieval. | design |
 | [13_reusable_helm_chart_model_serving](13_reusable_helm_chart_model_serving/README.md) | Opinionated Helm chart wrapping KFServing/Seldon with best-practice defaults. | N/A |
 | [14_chaos_engineering_suite_ml_pipelines](14_chaos_engineering_suite_ml_pipelines/README.md) | Injects failures into ML pipelines using LitmusChaos to validate auto-healing and rollback mechanisms. | plan |
-| [15_opentelemetry_tracing_ml_inference](15_opentelemetry_tracing_ml_inference/README.md) | Adds end-to-end distributed tracing of an ML inference request using OpenTelemetry. | draft |
+| [15_opentelemetry_tracing_ml_inference](15_opentelemetry_tracing_ml_inference/README.md) | Adds end-to-end distributed tracing of an ML inference request using OpenTelemetry. | ready |
 
+## Contributing
+
+Each project follows a similar structure:
+- `README.md` - Project overview, architecture, and usage instructions
+- Implementation files (Docker, Terraform, Python, etc.)
+- Example configurations and test scripts
+
+Feel free to open issues or submit PRs to improve existing projects or suggest new MLOps patterns to demonstrate.
+
+## License
+
+See individual project directories for specific licenses. Most code is provided as examples and templates for educational purposes.
