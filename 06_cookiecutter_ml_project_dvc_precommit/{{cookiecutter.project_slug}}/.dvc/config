@@ -1,0 +1,2 @@
+['remote "storage"']
+    url = {{cookiecutter.dvc_remote_url}}

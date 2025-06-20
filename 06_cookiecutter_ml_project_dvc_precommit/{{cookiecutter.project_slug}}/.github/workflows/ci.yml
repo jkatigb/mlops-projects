@@ -1,0 +1,19 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: {{cookiecutter.python_version}}
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install dvc
+      - name: Pull data
+        run: dvc pull
+      - name: Run tests
+        run: pytest -q

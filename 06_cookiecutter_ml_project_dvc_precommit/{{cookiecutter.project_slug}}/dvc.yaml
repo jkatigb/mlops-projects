@@ -1,0 +1,7 @@
+stages:
+  prepare:
+    cmd: python src/train.py
+    deps:
+    - data/raw/dataset.csv
+    outs:
+    - data/processed/dataset.csv

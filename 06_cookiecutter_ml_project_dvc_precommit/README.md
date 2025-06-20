@@ -24,12 +24,12 @@ Inconsistent repo structures slow collaboration. This template bakes in sensible
 ```
 
 ## Task Checklist
-- [ ] Create `cookiecutter.json` prompts (project_name, author, license, AWS profile, etc.)  
-- [ ] DVC remote config (S3 or GCS)  
-- [ ] Template `pyproject.toml` with dependencies  
-- [ ] Pre-commit config with required hooks  
-- [ ] GitHub Actions workflow: install deps → `dvc pull` → `pytest -q`  
-- [ ] Example notebook & script using tracked dataset  
+- [x] Create `cookiecutter.json` prompts (project_name, author, license, AWS profile, etc.)  
+- [x] DVC remote config (S3 or GCS)  
+- [x] Template `pyproject.toml` with dependencies  
+- [x] Pre-commit config with required hooks  
+- [x] GitHub Actions workflow: install deps → `dvc pull` → `pytest -q`  
+- [x] Example notebook & script using tracked dataset  
 - [ ] Documentation site (mkdocs) optional  
 
 ## Usage
@@ -42,4 +42,4 @@ pytest
 ```
 
 ---
-*Status*: boilerplate 
+*Status*: alpha 
