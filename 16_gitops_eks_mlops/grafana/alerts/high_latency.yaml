@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: high-latency
+  namespace: monitoring
+spec:
+  groups:
+  - name: model.rules
+    rules:
+    - alert: HighLatency
+      expr: histogram_quantile(0.95, sum(rate(request_latency_bucket[5m])) by (le)) > 1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: High inference latency

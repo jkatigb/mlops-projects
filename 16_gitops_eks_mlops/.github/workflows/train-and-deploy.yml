@@ -1,0 +1,36 @@
+name: Train and Deploy
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  MLFLOW_TRACKING_URI: http://mlflow.default.svc.cluster.local:5000
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install deps
+        run: pip install scikit-learn mlflow boto3 joblib
+      - name: Train
+        run: python scripts/train.py
+      - name: Build image
+        run: docker build -t $ECR_REPOSITORY:$GITHUB_SHA .
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          region: ${{ env.AWS_REGION }}
+      - name: Push image
+        run: docker push $ECR_REPOSITORY:$GITHUB_SHA
+      - name: Update manifest
+        run: |
+          sed -i "s#REPOSITORY_URI:TAG#$ECR_REPOSITORY:$GITHUB_SHA#" k8s/staging/deployment.yaml
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+          git commit -am "Deploy $GITHUB_SHA" && git push

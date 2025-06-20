@@ -1,0 +1,6 @@
+backendStore:
+  database:
+    type: sqlite
+  defaultArtifactRoot: s3://mlflow-artifacts
+service:
+  type: ClusterIP

@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model
+  namespace: prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: model
+  template:
+    metadata:
+      labels:
+        app: model
+    spec:
+      containers:
+      - name: model
+        image: REPOSITORY_URI:TAG
+        ports:
+        - containerPort: 8080
