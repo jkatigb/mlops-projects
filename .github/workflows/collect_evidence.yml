@@ -1,0 +1,47 @@
+name: collect-evidence
+
+on:
+  workflow_run:
+    workflows: ["train-and-deploy"]
+    types:
+      - completed
+
+jobs:
+  gather:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install boto3 mlflow
+
+      - name: Generate Terraform plan and compute hash
+        run: |
+          terraform init
+          terraform plan -out=plan.tfplan
+          sha256sum plan.tfplan | awk '{print $1}' > plan.sha256
+          echo "TERRAFORM_HASH=$(cat plan.sha256)" >> $GITHUB_ENV
+
+      - name: Determine container digest
+        run: |
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $IMAGE_NAME)
+          echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_ENV
+        env:
+          IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
+
+      - name: Run evidence collector
+        env:
+          RUN_ID: ${{ github.event.workflow_run.outputs.run_id }}
+          IMAGE_DIGEST: ${{ env.IMAGE_DIGEST }}
+          TERRAFORM_PLAN_PATH: plan.tfplan
+          KMS_KEY_ID: ${{ secrets.KMS_KEY_ID }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          SNS_TOPIC_ARN: ${{ secrets.SNS_TOPIC_ARN }}
+        run: python 11_automated_soc2_evidence_collector/collect_evidence.py
