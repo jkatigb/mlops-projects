@@ -1,0 +1,51 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: default
+  annotations:
+    description: "Allows pods to communicate within the same namespace while denying cross-namespace traffic"
+    security.mlops/policy: "namespace-isolation"
+  labels:
+    security.mlops/enforcement: "namespace-boundary"
+spec:
+  # Apply to all pods in the namespace
+  podSelector: {}
+  
+  # Allow ingress from pods in the same namespace
+  ingress:
+  - from:
+    # Allow traffic from any pod in the same namespace
+    - podSelector: {}
+    ports:
+    # Allow all ports - customize as needed
+    - protocol: TCP
+    - protocol: UDP
+    
+  # Allow egress to pods in the same namespace and essential services
+  egress:
+  # Allow DNS resolution (required for service discovery)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+      
+  # Allow traffic to pods in the same namespace
+  - to:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+    - protocol: UDP
+    
+  # Define both ingress and egress policy types
+  policyTypes:
+  - Ingress
+  - Egress

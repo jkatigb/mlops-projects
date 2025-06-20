@@ -1,0 +1,21 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sBlockPublicLB
+metadata:
+  name: block-public-lb
+  annotations:
+    description: "Ensures LoadBalancer services are internal-only unless explicitly allowed"
+spec:
+  enforcementAction: deny  # Options: deny, dryrun, warn
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Service"]
+    excludedNamespaces:
+      - kube-system
+      - kube-public
+      - ingress-nginx  # Often needs public LB
+      - istio-system   # Service mesh may need public gateway
+  parameters:
+    requireInternalAnnotation: true
+    allowedNamespaces:
+      - production-public  # Example namespace allowed to create public LBs
