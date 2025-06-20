@@ -1,5 +1,14 @@
-variable "aws_region" { default = "us-east-1" }
-variable "name" { default = "demo" }
+variable "aws_region" {
+  type        = string
+  description = "AWS region to deploy resources in"
+  default     = "us-east-1"
+}
+
+variable "name" {
+  type        = string
+  description = "Resource name prefix (e.g., project or environment identifier)"
+  default     = "demo"
+}
 variable "vpc_cidr" { default = "10.0.0.0/16" }
 variable "public_subnets" {
   type        = list(string)
