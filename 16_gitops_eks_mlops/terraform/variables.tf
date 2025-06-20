@@ -9,7 +9,11 @@ variable "name" {
   description = "Resource name prefix (e.g., project or environment identifier)"
   default     = "demo"
 }
-variable "vpc_cidr" { default = "10.0.0.0/16" }
+variable "vpc_cidr" {
+  type        = string
+  description = "CIDR block for the VPC"
+  default     = "10.0.0.0/16"
+}
 variable "public_subnets" {
   type        = list(string)
   description = "List of public subnet CIDR blocks for the VPC"
