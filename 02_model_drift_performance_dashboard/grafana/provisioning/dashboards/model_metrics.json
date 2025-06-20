@@ -4,25 +4,55 @@
     {
       "type": "graph",
       "title": "p95 Latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
       "targets": [
-        {"expr": "histogram_quantile(0.95, rate(request_duration_seconds_bucket[1m]))"}
+        {
+          "expr": "histogram_quantile(0.95, rate(request_duration_seconds_bucket[1m]))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          }
+        }
       ]
     },
     {
       "type": "graph",
       "title": "Drift Score",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
       "targets": [
-        {"expr": "model_drift_score"}
+        {
+          "expr": "model_drift_score",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          }
+        }
       ]
     },
     {
       "type": "graph",
       "title": "Error Rate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
       "targets": [
-        {"expr": "rate(requests_total{status!='200'}[1m])"}
+        {
+          "expr": "rate(requests_total{status!='200'}[1m])",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          }
+        }
       ]
     }
   ],
-  "schemaVersion": 16,
+  "schemaVersion": 30,
   "version": 1
 }
