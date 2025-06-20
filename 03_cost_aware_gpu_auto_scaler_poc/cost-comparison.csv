@@ -1,0 +1,4 @@
+Scenario,MonthlyHours,GPUType,CostPerHourUSD,MonthlyCostUSD
+AlwaysOn,720,g4dn.xlarge,0.752,541.44
+AutoScaled,80,g4dn.xlarge,0.752,60.16
+SavingsPercent,,,88.89%

@@ -1,0 +1,33 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "graph",
+      "title": "GPU Cost by Namespace",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "sum by(namespace) (rate(aws_cloudwatch_gpu_cost_namespaceCost[5m]))",
+          "legendFormat": "{{namespace}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 30,
+  "title": "GPU Cost Overview",
+  "timezone": "browser",
+  "version": 1
+}
