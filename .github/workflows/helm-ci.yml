@@ -1,0 +1,20 @@
+name: Helm CI
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.0
+      - name: Helm lint
+        run: helm lint 13_reusable_helm_chart_model_serving/chart
+      - name: Helm template
+        run: helm template test 13_reusable_helm_chart_model_serving/chart \
+          -f 13_reusable_helm_chart_model_serving/examples/values-fastapi.yaml
