@@ -1,0 +1,8 @@
+project: driver_stats
+registry: data/registry.db
+provider: local
+online_store:
+  type: redis
+offline_store:
+  type: file
+  path: data/offline_store

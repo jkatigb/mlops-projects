@@ -1,0 +1,25 @@
+version: '3'
+services:
+  redis:
+    image: redis:6
+    ports:
+      - "6379:6379"
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-feast}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-feast}
+      POSTGRES_DB: ${POSTGRES_DB:-feast}
+    ports:
+      - "5432:5432"
+  jupyter:
+    image: ghcr.io/feast-dev/feast-python-sdk:0.34.0
+    command: jupyter lab --ip=0.0.0.0 --allow-root --NotebookApp.token=''
+    volumes:
+      - ./:/workspace
+    working_dir: /workspace/04_feature_store_quick_start
+    ports:
+      - "8888:8888"
+    depends_on:
+      - redis
+      - postgres
