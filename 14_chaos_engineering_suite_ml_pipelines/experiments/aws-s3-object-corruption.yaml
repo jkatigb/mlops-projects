@@ -1,0 +1,25 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: s3-object-corruption-engine
+  namespace: chaos
+spec:
+  appinfo:
+    appns: default
+    applabel: "app=train-job"
+    appkind: job
+  engineState: active
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: aws-s3-object-corruption
+      spec:
+        components:
+          env:
+            - name: BUCKET_NAME
+              value: "ml-bucket"
+            - name: ACCESS_KEY
+              value: "YOUR_ACCESS_KEY"
+            - name: SECRET_KEY
+              value: "YOUR_SECRET_KEY"
+            - name: REGION
+              value: "us-east-1"

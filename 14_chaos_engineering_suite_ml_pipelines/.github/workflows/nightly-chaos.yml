@@ -1,0 +1,26 @@
+name: Nightly Chaos Tests
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-chaos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+      - name: Apply chaos experiments
+        run: |
+          kubectl apply -f experiments/pod-delete.yaml
+          kubectl apply -f experiments/aws-s3-object-corruption.yaml
+          kubectl apply -f experiments/network-latency.yaml
+      - name: Wait for completion
+        run: |
+          sleep 300
+          kubectl get chaosresults -n chaos
+      - name: Cleanup engines
+        run: |
+          kubectl delete chaosengine --all -n chaos

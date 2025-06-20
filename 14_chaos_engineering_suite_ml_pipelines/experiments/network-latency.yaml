@@ -1,0 +1,23 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: network-latency-engine
+  namespace: chaos
+spec:
+  appinfo:
+    appns: default
+    applabel: "app=inference-service"
+    appkind: deployment
+  engineState: active
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-network-latency
+      spec:
+        components:
+          env:
+            - name: NETWORK_INTERFACE
+              value: eth0
+            - name: LATENCY
+              value: "2000"
+            - name: PODS_AFFECTED_PERC
+              value: "100"
