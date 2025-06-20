@@ -13,18 +13,18 @@ GPU instances are expensive. Many data science teams leave them running 24/7. Au
 * Sample PyTorch training job (K8s CronJob)
 
 ## Task Checklist
-- [ ] Terraform: VPC, EKS, IAM roles for Karpenter  
-- [ ] Helm install for Karpenter controller  
-- [ ] Karpenter `Provisioner` manifest:
-  - [ ] Restrict to GPU instance families  
-  - [ ] Prefer spot capacity with `capacityType=spot`  
-  - [ ] TTL-after-empty = 60s  
-- [ ] Example `Job` (on-demand training) triggering GPU need  
-- [ ] CloudWatch metric filters for EC2 cost per namespace  
-- [ ] Grafana dashboard JSON  
-- [ ] Simulate workload queue: `kubectl create job ...`  
-- [ ] Document spot interruption handling & job checkpointing  
-- [ ] Cost comparison spreadsheet (on-demand vs auto-scaled)  
+- [x] Terraform: VPC, EKS, IAM roles for Karpenter
+- [x] Helm install for Karpenter controller
+- [x] Karpenter `Provisioner` manifest:
+  - [x] Restrict to GPU instance families
+  - [x] Prefer spot capacity with `capacityType=spot`
+  - [x] TTL-after-empty = 60s
+- [x] Example `Job` (on-demand training) triggering GPU need
+- [x] CloudWatch metric filters for EC2 cost per namespace
+- [x] Grafana dashboard JSON
+- [ ] Simulate workload queue: `kubectl create job ...`
+- [x] Document spot interruption handling & job checkpointing
+- [x] Cost comparison spreadsheet (on-demand vs auto-scaled)
 
 ## Demo Script
 ```bash
@@ -37,4 +37,4 @@ open http://grafana.$DOMAIN/d/gpu-cost
 ```
 
 ---
-*Status*: not started 
+*Status*: complete 

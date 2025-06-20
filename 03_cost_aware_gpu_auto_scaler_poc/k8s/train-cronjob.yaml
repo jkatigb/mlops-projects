@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: train-mnist
+spec:
+  schedule: "0 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: trainer
+            image: pytorch/pytorch:latest
+            command: ["python","-c","import time; print('training'); time.sleep(60)"]
+            resources:
+              limits:
+                nvidia.com/gpu: 1
+          tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+      backoffLimit: 1

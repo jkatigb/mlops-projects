@@ -1,0 +1,22 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "graph",
+      "title": "GPU Cost by Namespace",
+      "targets": [
+        {
+          "expr": "sum by(namespace) (rate(aws_cloudwatch_gpu_cost_namespaceCost[5m]))",
+          "legendFormat": "{{namespace}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 30,
+  "title": "GPU Cost Overview",
+  "timezone": "browser",
+  "version": 1
+}
