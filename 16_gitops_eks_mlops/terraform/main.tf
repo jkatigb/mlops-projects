@@ -16,6 +16,10 @@ module "eks" {
 
 resource "aws_ecr_repository" "mlops" {
   name = "${var.name}-mlops"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
 }
 
 output "cluster_endpoint" {
