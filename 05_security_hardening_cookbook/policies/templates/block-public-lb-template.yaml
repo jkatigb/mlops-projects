@@ -2,18 +2,93 @@ apiVersion: templates.gatekeeper.sh/v1
 kind: ConstraintTemplate
 metadata:
   name: k8sblockpubliclb
+  annotations:
+    description: "Prevents creation of public-facing LoadBalancer services without explicit internal annotations"
 spec:
   crd:
     spec:
       names:
         kind: K8sBlockPublicLB
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            allowedNamespaces:
+              type: array
+              description: "Namespaces allowed to create public LoadBalancers"
+              items:
+                type: string
+            requireInternalAnnotation:
+              type: boolean
+              description: "Require explicit internal annotation for all LoadBalancers"
+              default: true
   targets:
     - target: admission.k8s.gatekeeper.sh
       rego: |
         package k8sblockpubliclb
 
+        import future.keywords.contains
+        import future.keywords.if
+
+        # Check if namespace is allowed to create public LBs
+        allowed_namespace {
+          allowed := input.parameters.allowedNamespaces[_]
+          input.review.object.metadata.namespace == allowed
+        }
+
+        # Check for AWS internal load balancer annotation
+        has_aws_internal_annotation {
+          input.review.object.metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-internal"] == "true"
+        }
+
+        # Check for AWS NLB internal annotation
+        has_aws_nlb_internal_annotation {
+          input.review.object.metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-type"] == "nlb-ip"
+          input.review.object.metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-internal"] == "true"
+        }
+
+        # Check for GCP internal load balancer annotation
+        has_gcp_internal_annotation {
+          input.review.object.metadata.annotations["networking.gke.io/load-balancer-type"] == "Internal"
+        }
+
+        # Check for GCP internal load balancer annotation (legacy)
+        has_gcp_legacy_internal_annotation {
+          input.review.object.metadata.annotations["cloud.google.com/load-balancer-type"] == "Internal"
+        }
+
+        # Check for Azure internal load balancer annotation
+        has_azure_internal_annotation {
+          input.review.object.metadata.annotations["service.beta.kubernetes.io/azure-load-balancer-internal"] == "true"
+        }
+
+        # Check if any internal annotation is present
+        has_internal_annotation {
+          has_aws_internal_annotation
+        }
+
+        has_internal_annotation {
+          has_aws_nlb_internal_annotation
+        }
+
+        has_internal_annotation {
+          has_gcp_internal_annotation
+        }
+
+        has_internal_annotation {
+          has_gcp_legacy_internal_annotation
+        }
+
+        has_internal_annotation {
+          has_azure_internal_annotation
+        }
+
+        # Main violation rule
         violation[{"msg": msg}] {
+          input.review.object.kind == "Service"
           input.review.object.spec.type == "LoadBalancer"
-          not input.review.object.spec.loadBalancerIP
-          msg := "Service of type LoadBalancer must not be publicly accessible"
+          input.parameters.requireInternalAnnotation
+          not has_internal_annotation
+          not allowed_namespace
+          msg := sprintf("LoadBalancer service '%s' in namespace '%s' must have an internal annotation. Add one of: service.beta.kubernetes.io/aws-load-balancer-internal=true (AWS), networking.gke.io/load-balancer-type=Internal (GCP), or service.beta.kubernetes.io/azure-load-balancer-internal=true (Azure)", [input.review.object.metadata.name, input.review.object.metadata.namespace])
         }

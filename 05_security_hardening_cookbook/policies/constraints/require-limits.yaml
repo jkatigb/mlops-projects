@@ -2,8 +2,26 @@ apiVersion: constraints.gatekeeper.sh/v1beta1
 kind: K8sRequireLimits
 metadata:
   name: require-limits
+  annotations:
+    description: "Enforces resource limits and requests for container resource management and QoS"
 spec:
+  enforcementAction: deny  # Options: deny, dryrun, warn
   match:
     kinds:
       - apiGroups: ["apps"]
-        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet", "ReplicaSet"]
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["batch"]
+        kinds: ["Job", "CronJob"]
+    excludedNamespaces:
+      - kube-system
+      - kube-public
+      - kube-node-lease
+      - gatekeeper-system
+  parameters:
+    requireRequests: true  # Also enforce resource requests
+    requireEphemeralStorage: false  # Optionally require ephemeral-storage limits
+    exemptContainers:
+      - istio-proxy  # Service mesh sidecars often managed externally
+      - linkerd-proxy  # Another common service mesh

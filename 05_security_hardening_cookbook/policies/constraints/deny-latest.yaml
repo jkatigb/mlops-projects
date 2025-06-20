@@ -2,10 +2,25 @@ apiVersion: constraints.gatekeeper.sh/v1beta1
 kind: K8sDenyLatest
 metadata:
   name: deny-latest
+  annotations:
+    description: "Enforces specific version tags on container images for better traceability and security"
 spec:
+  enforcementAction: deny  # Options: deny, dryrun, warn
   match:
     kinds:
       - apiGroups: ["apps"]
-        kinds: ["Deployment", "DaemonSet", "StatefulSet"]
+        kinds: ["Deployment", "DaemonSet", "StatefulSet", "ReplicaSet"]
       - apiGroups: [""]
         kinds: ["Pod"]
+      - apiGroups: ["batch"]
+        kinds: ["Job", "CronJob"]
+    excludedNamespaces: 
+      - kube-system
+      - kube-public
+      - kube-node-lease
+      - gatekeeper-system
+  parameters:
+    exemptImages:
+      - "gcr.io/google_containers/"  # System images
+      - "k8s.gcr.io/"                # Kubernetes images
+      - "docker.io/istio/"           # Service mesh images

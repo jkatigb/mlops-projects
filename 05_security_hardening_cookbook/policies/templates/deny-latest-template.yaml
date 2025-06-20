@@ -2,18 +2,84 @@ apiVersion: templates.gatekeeper.sh/v1
 kind: ConstraintTemplate
 metadata:
   name: k8sdenylatest
+  annotations:
+    description: "Prevents use of ':latest' tag in container images for better version control and security"
 spec:
   crd:
     spec:
       names:
         kind: K8sDenyLatest
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            exemptImages:
+              type: array
+              description: "List of images exempt from this policy"
+              items:
+                type: string
   targets:
     - target: admission.k8s.gatekeeper.sh
       rego: |
         package k8sdenylatest
 
+        import future.keywords.contains
+        import future.keywords.if
+
+        # Check if image is exempt
+        exempt_image(image) {
+          exempt := input.parameters.exemptImages[_]
+          contains(image, exempt)
+        }
+
+        # Check containers in Deployments, ReplicaSets, DaemonSets, StatefulSets
         violation[{"msg": msg}] {
-          container := input.review.object.spec.template.spec.containers[_]
-          endswith(container.image, ":latest")
-          msg := sprintf("image %s uses the :latest tag", [container.image])
+          input.review.object.spec.template.spec.containers[_].image == image
+          endswith(image, ":latest")
+          not exempt_image(image)
+          msg := sprintf("Container image '%s' uses ':latest' tag. Use specific version tags for production stability.", [image])
+        }
+
+        # Check init containers in Deployments, ReplicaSets, DaemonSets, StatefulSets
+        violation[{"msg": msg}] {
+          input.review.object.spec.template.spec.initContainers[_].image == image
+          endswith(image, ":latest")
+          not exempt_image(image)
+          msg := sprintf("Init container image '%s' uses ':latest' tag. Use specific version tags for production stability.", [image])
+        }
+
+        # Check containers in Pods
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          input.review.object.spec.containers[_].image == image
+          endswith(image, ":latest")
+          not exempt_image(image)
+          msg := sprintf("Pod container image '%s' uses ':latest' tag. Use specific version tags for production stability.", [image])
+        }
+
+        # Check init containers in Pods
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          input.review.object.spec.initContainers[_].image == image
+          endswith(image, ":latest")
+          not exempt_image(image)
+          msg := sprintf("Pod init container image '%s' uses ':latest' tag. Use specific version tags for production stability.", [image])
+        }
+
+        # Check containers in Jobs
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Job"
+          input.review.object.spec.template.spec.containers[_].image == image
+          endswith(image, ":latest")
+          not exempt_image(image)
+          msg := sprintf("Job container image '%s' uses ':latest' tag. Use specific version tags for production stability.", [image])
+        }
+
+        # Check containers in CronJobs
+        violation[{"msg": msg}] {
+          input.review.object.kind == "CronJob"
+          input.review.object.spec.jobTemplate.spec.template.spec.containers[_].image == image
+          endswith(image, ":latest")
+          not exempt_image(image)
+          msg := sprintf("CronJob container image '%s' uses ':latest' tag. Use specific version tags for production stability.", [image])
         }

@@ -1,10 +1,18 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-deny
+  name: default-deny-all
   namespace: default
+  annotations:
+    description: "Default deny-all network policy for zero-trust network security"
+    security.mlops/policy: "deny-all"
+  labels:
+    security.mlops/enforcement: "baseline"
 spec:
+  # This policy applies to all pods in the namespace
   podSelector: {}
+  # Explicitly define both ingress and egress as denied by default
   policyTypes:
   - Ingress
   - Egress
+  # No ingress or egress rules defined means all traffic is denied

@@ -1,0 +1,32 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sPodSecurityStandards
+metadata:
+  name: pod-security-standards
+  annotations:
+    description: "Enforces Kubernetes Pod Security Standards for runtime security"
+spec:
+  enforcementAction: deny  # Options: deny, dryrun, warn
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "DaemonSet", "StatefulSet", "ReplicaSet"]
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["batch"]
+        kinds: ["Job", "CronJob"]
+    excludedNamespaces:
+      - kube-system
+      - kube-public
+      - kube-node-lease
+      - gatekeeper-system
+      - cert-manager  # Often needs elevated privileges
+  parameters:
+    # Security level options:
+    # - "privileged": No restrictions (not recommended)
+    # - "baseline": Prevents known privilege escalations (recommended minimum)
+    # - "restricted": Heavily restricted, follows security best practices
+    level: "baseline"
+    exemptContainers:
+      - istio-init     # Service mesh init containers often need privileges
+      - linkerd-init   # Another service mesh
+      - vault-agent    # HashiCorp Vault sidecar

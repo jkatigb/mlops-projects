@@ -1,0 +1,226 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8spodsecuritystandards
+  annotations:
+    description: "Enforces Pod Security Standards for container runtime security"
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sPodSecurityStandards
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            level:
+              type: string
+              description: "Security level: restricted, baseline, or privileged"
+              enum: ["restricted", "baseline", "privileged"]
+              default: "baseline"
+            exemptContainers:
+              type: array
+              description: "Container names exempt from these policies"
+              items:
+                type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8spodsecuritystandards
+
+        import future.keywords.contains
+        import future.keywords.if
+        import future.keywords.in
+
+        # Get security level
+        level := input.parameters.level
+
+        # Check if container is exempt
+        exempt_container(name) {
+          exempt := input.parameters.exemptContainers[_]
+          name == exempt
+        }
+
+        # Helper to get all containers
+        get_containers[container] {
+          containers := input.review.object.spec.containers[_]
+          container := containers
+        }
+
+        get_containers[container] {
+          containers := input.review.object.spec.template.spec.containers[_]
+          container := containers
+        }
+
+        get_containers[container] {
+          containers := input.review.object.spec.jobTemplate.spec.template.spec.containers[_]
+          container := containers
+        }
+
+        # Helper for init containers
+        get_init_containers[container] {
+          containers := input.review.object.spec.initContainers[_]
+          container := containers
+        }
+
+        get_init_containers[container] {
+          containers := input.review.object.spec.template.spec.initContainers[_]
+          container := containers
+        }
+
+        get_init_containers[container] {
+          containers := input.review.object.spec.jobTemplate.spec.template.spec.initContainers[_]
+          container := containers
+        }
+
+        # Get pod spec based on object type
+        get_pod_spec[spec] {
+          spec := input.review.object.spec
+          input.review.object.kind == "Pod"
+        }
+
+        get_pod_spec[spec] {
+          spec := input.review.object.spec.template.spec
+          input.review.object.kind in ["Deployment", "ReplicaSet", "DaemonSet", "StatefulSet"]
+        }
+
+        get_pod_spec[spec] {
+          spec := input.review.object.spec.jobTemplate.spec.template.spec
+          input.review.object.kind == "CronJob"
+        }
+
+        get_pod_spec[spec] {
+          spec := input.review.object.spec.template.spec
+          input.review.object.kind == "Job"
+        }
+
+        # BASELINE Level Checks
+
+        # Check for hostNetwork
+        violation[{"msg": msg}] {
+          level in ["baseline", "restricted"]
+          spec := get_pod_spec[_]
+          spec.hostNetwork == true
+          msg := "Pod uses hostNetwork which is not allowed in baseline security level"
+        }
+
+        # Check for hostPID
+        violation[{"msg": msg}] {
+          level in ["baseline", "restricted"]
+          spec := get_pod_spec[_]
+          spec.hostPID == true
+          msg := "Pod uses hostPID which is not allowed in baseline security level"
+        }
+
+        # Check for hostIPC
+        violation[{"msg": msg}] {
+          level in ["baseline", "restricted"]
+          spec := get_pod_spec[_]
+          spec.hostIPC == true
+          msg := "Pod uses hostIPC which is not allowed in baseline security level"
+        }
+
+        # Check for privileged containers
+        violation[{"msg": msg}] {
+          level in ["baseline", "restricted"]
+          container := get_containers[_]
+          not exempt_container(container.name)
+          container.securityContext.privileged == true
+          msg := sprintf("Container '%s' is privileged which is not allowed in baseline security level", [container.name])
+        }
+
+        # Check for privilege escalation
+        violation[{"msg": msg}] {
+          level in ["baseline", "restricted"]
+          container := get_containers[_]
+          not exempt_container(container.name)
+          container.securityContext.allowPrivilegeEscalation == true
+          msg := sprintf("Container '%s' allows privilege escalation which is not allowed in baseline security level", [container.name])
+        }
+
+        # Check for dangerous capabilities
+        dangerous_caps := ["CAP_SYS_ADMIN", "CAP_NET_ADMIN", "CAP_SYS_TIME", "CAP_SYS_MODULE", "CAP_DAC_READ_SEARCH"]
+
+        violation[{"msg": msg}] {
+          level in ["baseline", "restricted"]
+          container := get_containers[_]
+          not exempt_container(container.name)
+          cap := container.securityContext.capabilities.add[_]
+          cap in dangerous_caps
+          msg := sprintf("Container '%s' adds dangerous capability '%s'", [container.name, cap])
+        }
+
+        # RESTRICTED Level Additional Checks
+
+        # Must run as non-root
+        violation[{"msg": msg}] {
+          level == "restricted"
+          container := get_containers[_]
+          not exempt_container(container.name)
+          not container.securityContext.runAsNonRoot == true
+          msg := sprintf("Container '%s' must set runAsNonRoot=true in restricted security level", [container.name])
+        }
+
+        # Must have runAsUser > 0
+        violation[{"msg": msg}] {
+          level == "restricted"
+          container := get_containers[_]
+          not exempt_container(container.name)
+          container.securityContext.runAsUser == 0
+          msg := sprintf("Container '%s' cannot run as root (UID 0) in restricted security level", [container.name])
+        }
+
+        # Must drop ALL capabilities
+        violation[{"msg": msg}] {
+          level == "restricted"
+          container := get_containers[_]
+          not exempt_container(container.name)
+          not "ALL" in container.securityContext.capabilities.drop
+          msg := sprintf("Container '%s' must drop ALL capabilities in restricted security level", [container.name])
+        }
+
+        # Must have readOnlyRootFilesystem
+        violation[{"msg": msg}] {
+          level == "restricted"
+          container := get_containers[_]
+          not exempt_container(container.name)
+          not container.securityContext.readOnlyRootFilesystem == true
+          msg := sprintf("Container '%s' must set readOnlyRootFilesystem=true in restricted security level", [container.name])
+        }
+
+        # Check volume types
+        restricted_volume_types := ["hostPath", "nfs", "iscsi", "glusterfs", "rbd", "flexVolume", "cinder", "cephfs", "flocker", "fc", "azureFile", "vsphereVolume", "quobyte", "azureDisk", "portworxVolume", "scaleIO", "storageos", "csi"]
+
+        violation[{"msg": msg}] {
+          level == "restricted"
+          spec := get_pod_spec[_]
+          volume := spec.volumes[_]
+          volume_type := [k | volume[k]; k in restricted_volume_types][_]
+          msg := sprintf("Volume type '%s' is not allowed in restricted security level", [volume_type])
+        }
+
+        # Check seccomp profile
+        violation[{"msg": msg}] {
+          level == "restricted"
+          container := get_containers[_]
+          not exempt_container(container.name)
+          not container.securityContext.seccompProfile.type in ["RuntimeDefault", "Localhost"]
+          msg := sprintf("Container '%s' must use RuntimeDefault or Localhost seccomp profile in restricted security level", [container.name])
+        }
+
+        # Apply same checks to init containers
+        violation[{"msg": msg}] {
+          level in ["baseline", "restricted"]
+          container := get_init_containers[_]
+          not exempt_container(container.name)
+          container.securityContext.privileged == true
+          msg := sprintf("Init container '%s' is privileged which is not allowed in baseline security level", [container.name])
+        }
+
+        violation[{"msg": msg}] {
+          level == "restricted"
+          container := get_init_containers[_]
+          not exempt_container(container.name)
+          not container.securityContext.runAsNonRoot == true
+          msg := sprintf("Init container '%s' must set runAsNonRoot=true in restricted security level", [container.name])
+        }

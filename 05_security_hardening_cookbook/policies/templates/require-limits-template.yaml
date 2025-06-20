@@ -2,24 +2,165 @@ apiVersion: templates.gatekeeper.sh/v1
 kind: ConstraintTemplate
 metadata:
   name: k8srequirelimits
+  annotations:
+    description: "Ensures containers have resource requests and limits for proper scheduling and stability"
 spec:
   crd:
     spec:
       names:
         kind: K8sRequireLimits
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            requireRequests:
+              type: boolean
+              description: "Also require resource requests, not just limits"
+              default: true
+            requireEphemeralStorage:
+              type: boolean
+              description: "Require ephemeral-storage limits"
+              default: false
+            exemptContainers:
+              type: array
+              description: "Container names exempt from this policy"
+              items:
+                type: string
   targets:
     - target: admission.k8s.gatekeeper.sh
       rego: |
         package k8srequirelimits
 
-        violation[{"msg": msg}] {
-          container := input.review.object.spec.template.spec.containers[_]
-          not container.resources.limits.cpu
-          msg := sprintf("container %s missing cpu limit", [container.name])
+        import future.keywords.contains
+        import future.keywords.if
+
+        # Check if container is exempt
+        exempt_container(name) {
+          exempt := input.parameters.exemptContainers[_]
+          name == exempt
         }
 
-        violation[{"msg": msg}] {
+        # Helper to get containers from different workload types
+        get_containers[container] {
+          # Deployments, ReplicaSets, DaemonSets, StatefulSets
           container := input.review.object.spec.template.spec.containers[_]
+        }
+
+        get_containers[container] {
+          # Pods
+          input.review.object.kind == "Pod"
+          container := input.review.object.spec.containers[_]
+        }
+
+        get_containers[container] {
+          # Jobs
+          input.review.object.kind == "Job"
+          container := input.review.object.spec.template.spec.containers[_]
+        }
+
+        get_containers[container] {
+          # CronJobs
+          input.review.object.kind == "CronJob"
+          container := input.review.object.spec.jobTemplate.spec.template.spec.containers[_]
+        }
+
+        # Helper to get init containers
+        get_init_containers[container] {
+          # Deployments, ReplicaSets, DaemonSets, StatefulSets
+          container := input.review.object.spec.template.spec.initContainers[_]
+        }
+
+        get_init_containers[container] {
+          # Pods
+          input.review.object.kind == "Pod"
+          container := input.review.object.spec.initContainers[_]
+        }
+
+        get_init_containers[container] {
+          # Jobs
+          input.review.object.kind == "Job"
+          container := input.review.object.spec.template.spec.initContainers[_]
+        }
+
+        get_init_containers[container] {
+          # CronJobs
+          input.review.object.kind == "CronJob"
+          container := input.review.object.spec.jobTemplate.spec.template.spec.initContainers[_]
+        }
+
+        # Check CPU limits
+        violation[{"msg": msg}] {
+          container := get_containers[_]
+          not exempt_container(container.name)
+          not container.resources.limits.cpu
+          msg := sprintf("Container '%s' is missing CPU limits. Set resources.limits.cpu to ensure predictable performance.", [container.name])
+        }
+
+        # Check memory limits
+        violation[{"msg": msg}] {
+          container := get_containers[_]
+          not exempt_container(container.name)
           not container.resources.limits.memory
-          msg := sprintf("container %s missing memory limit", [container.name])
+          msg := sprintf("Container '%s' is missing memory limits. Set resources.limits.memory to prevent OOM kills.", [container.name])
+        }
+
+        # Check CPU requests (if enabled)
+        violation[{"msg": msg}] {
+          input.parameters.requireRequests
+          container := get_containers[_]
+          not exempt_container(container.name)
+          not container.resources.requests.cpu
+          msg := sprintf("Container '%s' is missing CPU requests. Set resources.requests.cpu for proper scheduling.", [container.name])
+        }
+
+        # Check memory requests (if enabled)
+        violation[{"msg": msg}] {
+          input.parameters.requireRequests
+          container := get_containers[_]
+          not exempt_container(container.name)
+          not container.resources.requests.memory
+          msg := sprintf("Container '%s' is missing memory requests. Set resources.requests.memory for proper scheduling.", [container.name])
+        }
+
+        # Check ephemeral storage limits (if enabled)
+        violation[{"msg": msg}] {
+          input.parameters.requireEphemeralStorage
+          container := get_containers[_]
+          not exempt_container(container.name)
+          not container.resources.limits["ephemeral-storage"]
+          msg := sprintf("Container '%s' is missing ephemeral-storage limits. Set resources.limits.ephemeral-storage to prevent disk exhaustion.", [container.name])
+        }
+
+        # Check init containers for CPU limits
+        violation[{"msg": msg}] {
+          container := get_init_containers[_]
+          not exempt_container(container.name)
+          not container.resources.limits.cpu
+          msg := sprintf("Init container '%s' is missing CPU limits. Set resources.limits.cpu to ensure predictable performance.", [container.name])
+        }
+
+        # Check init containers for memory limits
+        violation[{"msg": msg}] {
+          container := get_init_containers[_]
+          not exempt_container(container.name)
+          not container.resources.limits.memory
+          msg := sprintf("Init container '%s' is missing memory limits. Set resources.limits.memory to prevent OOM kills.", [container.name])
+        }
+
+        # Check init containers for CPU requests (if enabled)
+        violation[{"msg": msg}] {
+          input.parameters.requireRequests
+          container := get_init_containers[_]
+          not exempt_container(container.name)
+          not container.resources.requests.cpu
+          msg := sprintf("Init container '%s' is missing CPU requests. Set resources.requests.cpu for proper scheduling.", [container.name])
+        }
+
+        # Check init containers for memory requests (if enabled)
+        violation[{"msg": msg}] {
+          input.parameters.requireRequests
+          container := get_init_containers[_]
+          not exempt_container(container.name)
+          not container.resources.requests.memory
+          msg := sprintf("Init container '%s' is missing memory requests. Set resources.requests.memory for proper scheduling.", [container.name])
         }
