@@ -1,34 +1,27 @@
 # Real-Time Feature Pipeline with Kafka + Flink + Feast
 
-## Overview
-Streams raw sensor data through Kafka → Flink enrichment → Feast online store (Redis) for sub-10 ms feature retrieval during inference. Docker-compose enables local reproduction; Helm charts cover production deploy.
+This demo streams raw sensor readings through Kafka, enriches them with a PyFlink job and publishes features to a Feast online store backed by Redis.  A minimal ingestion pipeline loads historical data into the offline store and a sample notebook demonstrates feature retrieval at inference time.  Helm charts are provided for deploying the Flink job in production and Grafana dashboards monitor ingestion lag and Redis latency.
 
-## Why it matters
-Many organisations rely on nightly batch features, blocking real-time ML products. This PoC shows how to upgrade to low-latency, fresh features without a huge platform rewrite.
+## Usage
 
-## Tech Stack
-* Apache Kafka & Kafka Connect
-* Apache Flink job (Scala/Java or PyFlink)
-* Feast online store (Redis) & offline store (S3)
-* Docker-compose for local, Helm for k8s
-* Sample inference notebook
-
-## Task Checklist
-- [ ] Docker-compose: `zookeeper`, `kafka`, `redis`, `feast-core`, `feast-online`  
-- [ ] Kafka topic `raw_readings` + Avro schema  
-- [ ] Flink job: parse → calculate rolling stats → write to Feast online  
-- [ ] Feast repo with entity & feature view definitions  
-- [ ] Ingestion pipeline to backfill offline store (Spark or pandas)  
-- [ ] Notebook: query online store and run toy model  
-- [ ] Helm chart with values for prod cluster  
-- [ ] Grafana panel: ingestion lag & Redis latency  
-
-## Demo
 ```bash
-make compose-up
-python scripts/produce_sensor_stream.py
-# open notebook Inference.ipynb
+# start all services
+docker compose up -d
+
+# create Kafka topics
+./scripts/create_topics.sh
+
+# run the Flink enrichment job (local)
+python flink/flink_job.py
 ```
 
----
-*Status*: design 
+Open `notebooks/Inference.ipynb` to query features from the online store.
+
+## Contents
+- `docker-compose.yml` – Zookeeper, Kafka, Redis, Feast and Flink services
+- `avro/raw_reading.avsc` – Avro schema for the `raw_readings` topic
+- `flink/flink_job.py` – PyFlink job that computes rolling averages and writes to Feast
+- `feature_repo/` – Feast repository with feature definitions
+- `ingestion/offline_ingestion.py` – batch loader for offline store
+- `helm/` – example Helm chart for deploying the Flink job
+- `grafana/dashboard.json` – Grafana panels for ingestion lag and Redis latency

@@ -1,0 +1,51 @@
+version: '3.8'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.2.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+  kafka:
+    image: confluentinc/cp-kafka:7.2.1
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+  redis:
+    image: redis:6
+    ports:
+      - "6379:6379"
+  feast-core:
+    image: feastdev/feast-core:latest
+    environment:
+      SERVER_PORT: 6565
+    ports:
+      - "6565:6565"
+  feast-online:
+    image: feastdev/feast-online-serving:latest
+    depends_on:
+      - redis
+    environment:
+      FEAST_REDIS_TYPE: "redis"
+      FEAST_REDIS_CONNECTION_STRING: "redis:6379"
+    ports:
+      - "6566:6566"
+  jobmanager:
+    image: flink:1.14-scala_2.12
+    command: jobmanager
+    ports:
+      - "8081:8081"
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+  taskmanager:
+    image: flink:1.14-scala_2.12
+    command: taskmanager
+    depends_on:
+      - jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager

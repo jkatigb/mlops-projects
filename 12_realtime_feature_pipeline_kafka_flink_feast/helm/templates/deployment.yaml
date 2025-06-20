@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feature-pipeline
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: feature-pipeline
+  template:
+    metadata:
+      labels:
+        app: feature-pipeline
+    spec:
+      containers:
+        - name: flink-job
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          args: ["python", "flink_job.py"]
