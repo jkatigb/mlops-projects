@@ -1,0 +1,8 @@
+prometheus:
+  service:
+    type: ClusterIP
+  alertmanager:
+    enabled: true
+grafana:
+  service:
+    type: LoadBalancer

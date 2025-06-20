@@ -1,0 +1,7 @@
+{
+  "title": "Model Inference",
+  "panels": [
+    {"type": "graph", "title": "Requests", "targets": [{"expr": "sum(rate(http_requests_total[1m]))"}]},
+    {"type": "graph", "title": "Latency", "targets": [{"expr": "histogram_quantile(0.95, sum(rate(request_latency_bucket[5m])) by (le))"}]}
+  ]
+}
