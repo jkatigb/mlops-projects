@@ -1,0 +1,64 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  marquez:
+    image: marquezproject/marquez:0.35.0
+    depends_on:
+      - postgres
+    environment:
+      MARQUEZ_DB_HOST: postgres
+      MARQUEZ_DB_USER: airflow
+      MARQUEZ_DB_PASSWORD: airflow
+      MARQUEZ_DB_DATABASE: airflow
+    ports:
+      - "3000:3000"
+      - "5000:5000"
+
+  airflow-webserver:
+    image: apache/airflow:2.6.2
+    depends_on:
+      - postgres
+      - marquez
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__FERNET_KEY: ""
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      OPENLINEAGE_URL: http://marquez:5000
+      OPENLINEAGE_NAMESPACE: demo
+      PIP_EXTRA_REQUIREMENTS: openlineage-airflow
+    volumes:
+      - ./dags:/opt/airflow/dags
+    command: bash -c "airflow db migrate && airflow webserver"
+    ports:
+      - "8080:8080"
+
+  airflow-scheduler:
+    image: apache/airflow:2.6.2
+    depends_on:
+      - airflow-webserver
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__FERNET_KEY: ""
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      OPENLINEAGE_URL: http://marquez:5000
+      OPENLINEAGE_NAMESPACE: demo
+      PIP_EXTRA_REQUIREMENTS: openlineage-airflow
+    volumes:
+      - ./dags:/opt/airflow/dags
+    command: bash -c "airflow db migrate && airflow scheduler"
+
+volumes:
+  pgdata:
