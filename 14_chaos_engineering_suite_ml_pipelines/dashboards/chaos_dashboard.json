@@ -1,0 +1,15 @@
+{
+  "title": "Chaos Experiments",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Experiment Verdicts",
+      "targets": [
+        {
+          "expr": "chaosengine_experiment_status{engine=~\".*\", verdict=~\"(Pass|Fail)\"}",
+          "legendFormat": "{{engine}} - {{verdict}}"
+        }
+      ]
+    }
+  ]
+}

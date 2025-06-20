@@ -1,0 +1,10 @@
+# AWS credentials - never commit these!
+experiments/aws-secret.yaml
+
+# Local test results
+*.log
+results/
+
+# OS files
+.DS_Store
+Thumbs.db
