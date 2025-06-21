@@ -44,7 +44,7 @@ jobs:
         run: |
           crossplane xpkg build \
             --package-root=./10_multicloud_ml_platform_crossplane \
-            --ignore=".github/,*.md,argocd/,bootstrap/crossplane-install.yaml"
+            --ignore=".github/,*.md,argocd/,bootstrap/,*.sh,Makefile,cost-analysis.md,failover.sh,setup.sh"
             
       - name: Push package (main branch only)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
