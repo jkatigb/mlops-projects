@@ -29,7 +29,7 @@ jobs:
         
       - name: Set up Crossplane CLI
         run: |
-          curl -sL https://raw.githubusercontent.com/crossplane/crossplane/release-${CROSSPLANE_VERSION}/install.sh | sh
+          curl -sL https://raw.githubusercontent.com/crossplane/crossplane/master/install.sh | sh
           sudo mv kubectl-crossplane /usr/local/bin/
           kubectl crossplane --version
           
