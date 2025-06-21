@@ -1,0 +1,22 @@
+apiVersion: meta.pkg.crossplane.io/v1
+kind: Configuration
+metadata:
+  name: platform
+  annotations:
+    meta.crossplane.io/maintainer: Platform Team
+    meta.crossplane.io/source: github.com/jkatigb/mlops-projects
+    meta.crossplane.io/license: Apache-2.0
+    meta.crossplane.io/description: |
+      Multi-cloud ML platform configuration providing AWS EKS and GCP GKE
+      cluster provisioning with standardized APIs
+    meta.crossplane.io/readme: |
+      This configuration provides a standardized way to provision Kubernetes
+      clusters across AWS and GCP using Crossplane compositions.
+spec:
+  crossplane:
+    version: ">=v1.15.0"
+  dependsOn:
+    - configuration: xpkg.upbound.io/upbound/provider-aws
+      version: ">=v0.47.0"
+    - configuration: xpkg.upbound.io/upbound/provider-gcp
+      version: ">=v0.41.0"

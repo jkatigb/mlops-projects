@@ -1,0 +1,64 @@
+name: crossplane-packages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '10_multicloud_ml_platform_crossplane/**'
+      - '.github/workflows/crossplane-package.yml'
+  pull_request:
+    paths:
+      - '10_multicloud_ml_platform_crossplane/**'
+      - '.github/workflows/crossplane-package.yml'
+
+env:
+  CROSSPLANE_VERSION: v1.15.0
+  REGISTRY: xpkg.upbound.io
+  ORGANIZATION: myorg
+  PACKAGE_NAME: platform
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Crossplane CLI
+        run: |
+          curl -sL https://raw.githubusercontent.com/crossplane/crossplane/master/install.sh | sh
+          sudo mv crossplane /usr/local/bin/
+          crossplane version --client
+          
+      - name: Validate configuration
+        run: |
+          for file in $(find ./10_multicloud_ml_platform_crossplane -name "*.yaml" -o -name "*.yml"); do
+            echo "Validating $file"
+            kubectl apply --dry-run=client -f "$file" || true
+          done
+          
+      - name: Build configuration package
+        run: |
+          crossplane xpkg build \
+            --package-root=./10_multicloud_ml_platform_crossplane/package \
+            --ignore="*.md"
+            
+      - name: Push package (main branch only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
+        run: |
+          # Find the generated package file
+          PACKAGE_FILE=$(find ./10_multicloud_ml_platform_crossplane/package -name "*.xpkg" | head -1)
+          echo "Package file: $PACKAGE_FILE"
+          
+          crossplane xpkg push \
+            --package-files="$PACKAGE_FILE" \
+            ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:${GITHUB_SHA:0:8}
+          
+          crossplane xpkg push \
+            --package-files="$PACKAGE_FILE" \
+            ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:latest

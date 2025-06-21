@@ -14,23 +14,68 @@ Some organisations hedge cloud risk or need region-specific deployments. Crosspl
 * Sample FastAPI model server
 
 ## Task Checklist
-- [ ] Bootstrap management cluster (kind or EKS) with Crossplane  
-- [ ] Create `ProviderConfig` for AWS & GCP credentials  
-- [ ] CompositeResourceDefinition (XCluster) describing standard cluster  
-- [ ] Claim two clusters: `prod-us`, `prod-eu`  
-- [ ] Configure Argo CD with `ClusterSecretStore`  
-- [ ] ApplicationSet generating identical app per cluster  
-- [ ] CI workflow to run `kubectl crossplane build|push`  
-- [ ] Cost comparison & notes on egress pricing  
-- [ ] Failover script: drain AWS cluster, verify GKE still serves  
+* [x] Bootstrap management cluster (kind or EKS) with Crossplane
+* [x] Create `ProviderConfig` for AWS & GCP credentials
+* [x] CompositeResourceDefinition (XCluster) describing standard cluster
+* [x] Claim two clusters: `prod-us`, `prod-eu`
+* [x] Configure Argo CD with `ClusterSecretStore`
+* [x] ApplicationSet generating identical app per cluster
+* [x] CI workflow to run `kubectl crossplane build|push`
+* [x] Cost comparison & notes on egress pricing
+* [x] Failover script: drain AWS cluster, verify GKE still serves
 
 ## Demo Script
+
+### Prerequisites
+* kubectl configured with access to management cluster
+* AWS and GCP credentials configured as secrets
+* Argo CD installed in the management cluster
+
 ```bash
 make crossplane-up
 kubectl get clusters  # should list prod-us, prod-eu
 kubectl get applications -n argocd
 kubectl exec curl ...  # call inference endpoint in both regions
+./failover.sh         # simulate AWS outage
 ```
 
+## Cost Analysis
+See [cost-analysis.md](cost-analysis.md) for rough pricing details.
+
+## Quick Start
+
+```bash
+# 1. Run setup script (installs Crossplane, ArgoCD, creates secrets)
+./setup.sh
+
+# 2. Deploy clusters (takes 10-15 minutes)
+make deploy-clusters
+
+# 3. Check cluster status
+make check-clusters
+
+# 4. Deploy applications
+make deploy-apps
+
+# 5. Test endpoints
+make test-endpoints
+```
+
+## Architecture
+
+This project demonstrates:
+* **Multi-cloud abstraction**: Single API (Kubernetes CRDs) for both AWS and GCP
+* **GitOps deployment**: ArgoCD ApplicationSets deploy to all clusters automatically
+* **Disaster recovery**: Automated failover between regions/clouds
+* **Cost optimization**: Uses GKE Autopilot and EKS managed node groups
+
+## Files
+
+* `bootstrap/`: Crossplane installation and provider configurations
+* `clusters/`: XRD definitions, compositions, and cluster claims
+* `argocd/`: ApplicationSet for multi-cluster deployments
+* `.github/workflows/`: CI for building/pushing Crossplane packages
+
 ---
-*Status*: idea 
+*Status*: completed
+

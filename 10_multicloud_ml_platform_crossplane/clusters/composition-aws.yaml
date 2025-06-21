@@ -1,0 +1,238 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: aws-xcluster
+  labels:
+    provider: aws
+    cluster: eks
+spec:
+  writeConnectionSecretsToNamespace: crossplane-system
+  compositeTypeRef:
+    apiVersion: platform.orbis.dev/v1alpha1
+    kind: XCluster
+  
+  resources:
+    # VPC
+    - name: vpc
+      base:
+        apiVersion: ec2.aws.crossplane.io/v1beta1
+        kind: VPC
+        spec:
+          forProvider:
+            enableDnsHostNames: true
+            enableDnsSupport: true
+      patches:
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        - fromFieldPath: spec.networkCIDR
+          toFieldPath: spec.forProvider.cidrBlock
+        - fromFieldPath: spec.tags
+          toFieldPath: spec.forProvider.tags
+          policy:
+            mergeOptions:
+              appendSlice: true
+
+    # Internet Gateway
+    - name: internet-gateway
+      base:
+        apiVersion: ec2.aws.crossplane.io/v1beta1
+        kind: InternetGateway
+        spec:
+          forProvider:
+            vpcIdSelector:
+              matchControllerRef: true
+      patches:
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+
+    # Subnets
+    - name: subnet-a
+      base:
+        apiVersion: ec2.aws.crossplane.io/v1beta1
+        kind: Subnet
+        spec:
+          forProvider:
+            mapPublicIpOnLaunch: true
+            vpcIdSelector:
+              matchControllerRef: true
+      patches:
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.availabilityZone
+          transforms:
+            - type: string
+              string:
+                fmt: "%sa"
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.networkCIDR
+          toFieldPath: spec.forProvider.cidrBlock
+          transforms:
+            - type: string
+              string:
+                fmt: "%s"
+              # This is simplified - in production, use proper CIDR math
+              regexp:
+                match: '(\d+\.\d+)\.\d+\.\d+/\d+'
+                group: 1
+            - type: string
+              string:
+                fmt: "%s.1.0/24"
+
+    - name: subnet-b
+      base:
+        apiVersion: ec2.aws.crossplane.io/v1beta1
+        kind: Subnet
+        spec:
+          forProvider:
+            mapPublicIpOnLaunch: true
+            vpcIdSelector:
+              matchControllerRef: true
+      patches:
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.availabilityZone
+          transforms:
+            - type: string
+              string:
+                fmt: "%sb"
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.networkCIDR
+          toFieldPath: spec.forProvider.cidrBlock
+          transforms:
+            - type: string
+              string:
+                fmt: "%s"
+              regexp:
+                match: '(\d+\.\d+)\.\d+\.\d+/\d+'
+                group: 1
+            - type: string
+              string:
+                fmt: "%s.2.0/24"
+
+    # EKS Cluster
+    - name: eks-cluster
+      base:
+        apiVersion: eks.aws.crossplane.io/v1beta1
+        kind: Cluster
+        spec:
+          forProvider:
+            roleArnSelector:
+              matchControllerRef: true
+            resourcesVpcConfig:
+              endpointPrivateAccess: false
+              endpointPublicAccess: true
+              subnetIdSelector:
+                matchControllerRef: true
+      patches:
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        - fromFieldPath: spec.kubernetesVersion
+          toFieldPath: spec.forProvider.version
+        - fromFieldPath: spec.enableLogging
+          toFieldPath: spec.forProvider.logging.clusterLogging[0].enabled
+        - fromFieldPath: metadata.uid
+          toFieldPath: spec.writeConnectionSecretToRef.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-eks-connection"
+      connectionDetails:
+        - fromConnectionSecretKey: kubeconfig
+          name: kubeconfig
+        - fromConnectionSecretKey: endpoint
+          name: endpoint
+        - fromConnectionSecretKey: clusterCA
+          name: clusterCA
+
+    # Node Group
+    - name: nodegroup
+      base:
+        apiVersion: eks.aws.crossplane.io/v1beta1
+        kind: NodeGroup
+        spec:
+          forProvider:
+            instanceTypes:
+              - t3.medium
+            clusterNameSelector:
+              matchControllerRef: true
+            nodeRoleSelector:
+              matchControllerRef: true
+            subnetIdSelector:
+              matchControllerRef: true
+            scalingConfig:
+              minSize: 1
+      patches:
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        - fromFieldPath: spec.nodeCount
+          toFieldPath: spec.forProvider.scalingConfig.desiredSize
+        - fromFieldPath: spec.nodeCount
+          toFieldPath: spec.forProvider.scalingConfig.maxSize
+          transforms:
+            - type: math
+              math:
+                multiply: 2
+        - fromFieldPath: spec.nodeSize
+          toFieldPath: spec.forProvider.instanceTypes[0]
+          transforms:
+            - type: map
+              map:
+                small: t3.small
+                medium: t3.medium
+                large: t3.large
+                xlarge: t3.xlarge
+
+    # IAM Role for EKS
+    - name: eks-cluster-role
+      base:
+        apiVersion: iam.aws.crossplane.io/v1beta1
+        kind: Role
+        spec:
+          forProvider:
+            assumeRolePolicyDocument: |
+              {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": "eks.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+                  }
+                ]
+              }
+            managedPolicyArns:
+              - "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+              - "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
+
+    # IAM Role for Nodes
+    - name: nodegroup-role
+      base:
+        apiVersion: iam.aws.crossplane.io/v1beta1
+        kind: Role
+        spec:
+          forProvider:
+            assumeRolePolicyDocument: |
+              {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": "ec2.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+                  }
+                ]
+              }
+            managedPolicyArns:
+              - "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+              - "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+              - "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"

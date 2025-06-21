@@ -1,0 +1,91 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: gcp-xcluster
+  labels:
+    provider: gcp
+    cluster: gke
+spec:
+  writeConnectionSecretsToNamespace: crossplane-system
+  compositeTypeRef:
+    apiVersion: platform.orbis.dev/v1alpha1
+    kind: XCluster
+  
+  resources:
+    # GKE Cluster
+    - name: gke-cluster
+      base:
+        apiVersion: container.gcp.crossplane.io/v1beta2
+        kind: Cluster
+        spec:
+          forProvider:
+            autopilot:
+              enabled: true
+            addonsConfig:
+              horizontalPodAutoscaling:
+                disabled: false
+              httpLoadBalancing:
+                disabled: false
+              kubernetesDashboard:
+                disabled: true
+              networkPolicyConfig:
+                disabled: false
+            networkConfig:
+              enableIntraNodeVisibility: true
+            loggingService: "logging.googleapis.com/kubernetes"
+            monitoringService: "monitoring.googleapis.com/kubernetes"
+      patches:
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.location
+        - fromFieldPath: metadata.uid
+          toFieldPath: spec.writeConnectionSecretToRef.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-gke-connection"
+        - fromFieldPath: spec.networkCIDR
+          toFieldPath: spec.forProvider.clusterIpv4Cidr
+      connectionDetails:
+        - fromConnectionSecretKey: kubeconfig
+          name: kubeconfig
+        - fromConnectionSecretKey: endpoint
+          name: endpoint
+        - fromConnectionSecretKey: clusterCA
+          name: clusterCA
+
+    # For standard (non-autopilot) GKE clusters, we would add node pools
+    # Since we're using autopilot, nodes are managed automatically
+    
+    # Network configuration for standard GKE
+    - name: gke-network
+      base:
+        apiVersion: compute.gcp.crossplane.io/v1beta1
+        kind: Network
+        spec:
+          forProvider:
+            autoCreateSubnetworks: false
+            routingConfig:
+              routingMode: REGIONAL
+      patches:
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.location
+          
+    - name: gke-subnetwork
+      base:
+        apiVersion: compute.gcp.crossplane.io/v1beta1
+        kind: Subnetwork
+        spec:
+          forProvider:
+            networkSelector:
+              matchControllerRef: true
+            privateIpGoogleAccess: true
+            secondaryIpRanges:
+              - rangeName: pods
+                ipCidrRange: 10.200.0.0/14
+              - rangeName: services
+                ipCidrRange: 10.204.0.0/16
+      patches:
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        - fromFieldPath: spec.networkCIDR
+          toFieldPath: spec.forProvider.ipCidrRange
