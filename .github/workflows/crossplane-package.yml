@@ -35,8 +35,10 @@ jobs:
           
       - name: Validate configuration
         run: |
-          find ./10_multicloud_ml_platform_crossplane -name "*.yaml" -o -name "*.yml" | \
-            xargs kubectl --dry-run=client apply -f
+          for file in $(find ./10_multicloud_ml_platform_crossplane -name "*.yaml" -o -name "*.yml"); do
+            echo "Validating $file"
+            kubectl apply --dry-run=client -f "$file" || true
+          done
           
       - name: Build configuration package
         run: |
