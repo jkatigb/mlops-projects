@@ -1,0 +1,119 @@
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# GitHub
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# DVC
+.dvc/cache/
+.dvc/tmp/
+
+# Data (managed by DVC)
+data/raw/
+data/processed/
+data/interim/
+data/external/
+
+# Models (managed by DVC)
+models/
+
+# MLflow
+mlruns/
+
+# Weights & Biases
+wandb/
+
+# Logs
+logs/
+*.log
+
+# Reports
+reports/
+
+# Tests
+tests/
+conftest.py
+
+# CI/CD
+.travis.yml
+.gitlab-ci.yml
+azure-pipelines.yml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Build artifacts
+build/
+dist/
+*.egg
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Notebooks (keep only production notebooks)
+notebooks/
+!notebooks/production/
+
+# Development files
+Makefile
+docker-compose*.yml
+*.sh
+
+# Profiling
+*.prof
+*.stats
+
+# Cache
+.cache/

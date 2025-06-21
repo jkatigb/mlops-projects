@@ -1,0 +1,13 @@
+```mermaid
+graph TD
+    subgraph Airflow
+        DP[data prep]
+        TR[train model]
+        DE[deploy]
+    end
+    DP --> TR --> DE
+    DP -- emits events --> MQ((Marquez))
+    TR -- emits events --> MQ
+    DE -- emits events --> MQ
+    MQ --> UI[Lineage UI]
+```
