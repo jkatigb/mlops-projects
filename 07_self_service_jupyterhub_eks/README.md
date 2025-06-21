@@ -1,36 +1,155 @@
-# Self-Service JupyterHub on EKS
+# Self-Service JupyterHub on AWS EKS
 
-## Overview
-Deploys JupyterHub via Helm on AWS EKS with per-user IAM roles and idle-cull automation. DS teams get secure, cost-controlled notebooks that integrate with existing S3 data lakes.
+A production-ready deployment of JupyterHub on AWS EKS with GPU support, auto-scaling, and secure multi-user environments for data science teams.
 
-## Why it matters
-Unmanaged notebooks consume GPUs and leak credentials. Providing a governed, ephemeral environment boosts productivity while slashing infra waste.
+## Features
+
+- **Multi-User Support**: GitHub OAuth authentication with organization-based access control
+- **GPU Support**: NVIDIA T4 GPU nodes for deep learning workloads
+- **Auto-Scaling**: Cluster autoscaling based on resource demand
+- **Persistent Storage**: User data persistence with S3 integration
+- **Multiple Profiles**: Pre-configured compute profiles (CPU/GPU, various sizes)
+- **Security**: IAM roles for service accounts (IRSA), network policies, and secure defaults
+- **Cost Optimization**: Automatic culling of idle instances, spot instance support
+
+## Architecture
+
+```
+┌─────────────────┐     ┌──────────────────┐
+│   Users         │────▶│  Load Balancer   │
+└─────────────────┘     └──────────────────┘
+                               │
+                        ┌──────▼──────┐
+                        │ JupyterHub  │
+                        │    Proxy    │
+                        └──────┬──────┘
+                               │
+                ┌──────────────┴──────────────┐
+                │                             │
+          ┌─────▼─────┐                ┌─────▼─────┐
+          │    Hub    │                │   User    │
+          │  Service  │                │   Pods    │
+          └─────┬─────┘                └─────┬─────┘
+                │                             │
+                └──────────┬──────────────────┘
+                           │
+                    ┌──────▼──────┐
+                    │     EKS     │
+                    │   Cluster   │
+                    └──────┬──────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+    ┌────▼────┐      ┌────▼────┐      ┌────▼────┐
+    │  System │      │   CPU   │      │   GPU   │
+    │  Nodes  │      │  Nodes  │      │  Nodes  │
+    └─────────┘      └─────────┘      └─────────┘
+```
 
 ## Tech Stack
-* AWS EKS + IAM Roles for ServiceAccounts (IRSA)
-* JupyterHub Helm chart (Zero to JupyterHub)
-* Karpenter optional for autoscaling nodes
-* Idle-cull & resource quotas
-* Terraform for infra
 
-## Task Checklist
-- [ ] Terraform: VPC, EKS, OIDC provider, IAM policies for S3  
-- [ ] Helm values:
-  - [ ] SingleUser profile with GPU & CPU options  
-  - [ ] HUB image with LDAP/OIDC auth (Cognito or Okta)  
-  - [ ] Idle culler >30 min inactivity  
-- [ ] IRSA annotations for per-user S3 access  
-- [ ] Pre-configured Conda environments via `repo2docker`  
-- [ ] Docs: how to add new environment via Git PR  
-- [ ] Grafana dashboard: active users vs. node utilisation  
-- [ ] Cost guardrails: PodDisruptionBudget & shutdown window  
+- **Infrastructure**: AWS EKS, VPC, IAM, S3, KMS
+- **Orchestration**: Kubernetes 1.29, Helm 3.x
+- **Compute**: EC2 (T3 for CPU, G4dn for GPU), Spot instances
+- **Networking**: AWS Load Balancer Controller, VPC CNI
+- **Storage**: EBS CSI Driver, S3 FUSE
+- **Security**: IRSA, Network Policies, Pod Security Standards
+- **Monitoring**: CloudWatch Logs, optional Prometheus/Grafana
 
-## Quick Demo
+## Quick Start
+
+### Prerequisites
+
+- AWS CLI configured with appropriate credentials
+- Terraform >= 1.0
+- kubectl >= 1.24
+- Helm >= 3.0
+- GitHub OAuth App (for authentication)
+
+### Deploy Infrastructure
+
 ```bash
-make infra-up
-helm upgrade --install jhub jupyterhub/jupyterhub -f helm/values.yaml
-open https://jupyter.$DOMAIN  # login with test@orbis.dev
+# Clone the repository
+cd 07_self_service_jupyterhub_eks
+
+# Configure variables
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+# Edit terraform/terraform.tfvars with your settings
+
+# Deploy AWS infrastructure
+cd terraform
+terraform init
+terraform plan
+terraform apply
+
+# Configure kubectl
+aws eks update-kubeconfig --region $(terraform output -raw region) --name $(terraform output -raw cluster_name)
+```
+
+### Install JupyterHub
+
+```bash
+# Add JupyterHub Helm repository
+helm repo add jupyterhub https://jupyterhub.github.io/helm-chart/
+helm repo update
+
+# Update Helm values with your configuration
+# Edit helm/jupyterhub-values.yaml with GitHub OAuth credentials
+
+# Install JupyterHub
+helm upgrade --install jupyterhub jupyterhub/jupyterhub \
+  --namespace jupyterhub \
+  --values helm/jupyterhub-values.yaml \
+  --version 3.3.7
+
+# Get JupyterHub URL
+kubectl get svc -n jupyterhub proxy-public -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+```
+
+## User Profiles
+
+| Profile | CPU | Memory | GPU | Use Case |
+|---------|-----|--------|-----|----------|
+| Minimal | 0.5-2 | 1-4 GB | - | Light development |
+| Standard | 2-4 | 4-8 GB | - | Regular data science |
+| Large | 4-8 | 16-32 GB | - | Memory-intensive work |
+| GPU | 4-8 | 16-32 GB | 1x T4 | Deep learning |
+
+## Cost Optimization
+
+- **Spot Instances**: 60-90% savings on compute
+- **Auto-scaling**: Nodes scale based on demand
+- **Idle Culling**: Automatic shutdown after 1 hour
+- **Right-sizing**: Multiple profiles for different workloads
+
+## Security Features
+
+- **Authentication**: GitHub OAuth with org restrictions
+- **Authorization**: Admin users and RBAC
+- **Network**: Private subnets, security groups, network policies
+- **Data**: Encrypted at rest (S3, EBS), user isolation
+- **Secrets**: AWS Secrets Manager, Kubernetes secrets
+
+## Maintenance
+
+See the full README for detailed instructions on:
+- Upgrading JupyterHub
+- Scaling node groups
+- Backup and recovery
+- Monitoring and troubleshooting
+- Advanced configuration
+
+## Clean Up
+
+```bash
+# Delete JupyterHub
+helm uninstall jupyterhub -n jupyterhub
+
+# Destroy infrastructure
+cd terraform
+terraform destroy
 ```
 
 ---
-*Status*: skeleton 
+*Status*: Production-ready
+
