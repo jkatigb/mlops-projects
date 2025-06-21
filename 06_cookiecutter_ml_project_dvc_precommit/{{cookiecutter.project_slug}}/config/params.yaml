@@ -1,0 +1,139 @@
+# Model parameters and configuration
+# This file is tracked by DVC and used in pipeline stages
+
+# Data preparation parameters
+prepare:
+  test_split: 0.2
+  validation_split: 0.1
+  seed: 42
+  normalize: true
+  handle_missing: "median"  # mean, median, mode, drop
+  outlier_method: "iqr"  # iqr, zscore, isolation_forest, none
+  outlier_threshold: 1.5
+
+# Feature engineering parameters
+features:
+  engineering:
+    polynomial_degree: 2
+    interaction_only: false
+    create_clusters: true
+    n_clusters: 5
+    encode_categorical: true
+    encoding_method: "target"  # onehot, label, target, ordinal
+  selection:
+    method: "mutual_info"  # mutual_info, chi2, anova, recursive, none
+    k_best: 20
+    variance_threshold: 0.01
+
+# Model parameters
+model:
+  type: "random_forest"  # random_forest, xgboost, lightgbm, neural_network
+  hyperparameters:
+    # Random Forest
+    n_estimators: 100
+    max_depth: 10
+    min_samples_split: 5
+    min_samples_leaf: 2
+    max_features: "sqrt"
+    # XGBoost
+    learning_rate: 0.1
+    n_estimators: 100
+    max_depth: 6
+    subsample: 0.8
+    colsample_bytree: 0.8
+    # Neural Network
+    hidden_layers: [128, 64, 32]
+    activation: "relu"
+    dropout_rate: 0.2
+    batch_norm: true
+
+# Training parameters
+training:
+  batch_size: 32
+  epochs: 100
+  learning_rate: 0.001
+  optimizer: "adam"  # adam, sgd, rmsprop
+  early_stopping: true
+  patience: 10
+  reduce_lr_patience: 5
+  reduce_lr_factor: 0.5
+  class_weight: "balanced"  # balanced, none, custom
+  cross_validation:
+    enabled: true
+    n_splits: 5
+    strategy: "stratified"  # stratified, time_series, group
+
+# Evaluation parameters
+evaluation:
+  metrics:
+    - accuracy
+    - precision
+    - recall
+    - f1
+    - auc_roc
+    - auc_pr
+  threshold_optimization: true
+  bootstrap_iterations: 1000
+  confidence_level: 0.95
+
+# Model export parameters
+export:
+  format: "onnx"  # onnx, tensorflow, pytorch, pickle
+  quantize: false
+  optimize: true
+  include_preprocessing: true
+  metadata:
+    version: "1.0.0"
+    author: "{{cookiecutter.author_name}}"
+    description: "{{cookiecutter.description}}"
+
+{% if cookiecutter.include_model_monitoring == 'yes' -%}
+# Monitoring parameters
+monitoring:
+  drift_detection:
+    method: "ks"  # ks, chi2, wasserstein, psi
+    threshold: 0.1
+    reference_window: 1000
+    test_window: 100
+  performance:
+    metrics_window: 24  # hours
+    alert_threshold: 0.05
+    baseline_update: "monthly"  # daily, weekly, monthly
+  data_quality:
+    check_missing: true
+    check_range: true
+    check_uniqueness: true
+    check_consistency: true
+{% endif -%}
+
+{% if cookiecutter.include_api_service == 'yes' -%}
+# API parameters
+api:
+  batch_size: 100
+  max_concurrent_requests: 10
+  timeout: 30  # seconds
+  cache_ttl: 3600  # seconds
+  enable_swagger: true
+  enable_metrics: true
+  model_warm_up: true
+  preprocessing_workers: 4
+{% endif -%}
+
+# Infrastructure parameters
+infrastructure:
+  memory_limit: "4Gi"
+  cpu_limit: "2"
+  gpu_enabled: {{cookiecutter.include_gpu_support == 'yes'}}
+  gpu_type: "nvidia-tesla-t4"
+  autoscaling:
+    enabled: true
+    min_replicas: 2
+    max_replicas: 10
+    target_cpu_utilization: 70
+
+# Logging parameters
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "json"
+  include_context: true
+  sample_rate: 0.1  # Log sampling for high-volume predictions

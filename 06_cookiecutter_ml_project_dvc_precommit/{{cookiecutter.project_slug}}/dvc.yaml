@@ -1,0 +1,137 @@
+vars:
+  - config/params.yaml
+
+stages:
+  validate_data:
+    cmd: python src/data/validate.py --input data/raw --output reports/data_validation.html
+    deps:
+      - src/data/validate.py
+      - data/raw
+    outs:
+      - reports/data_validation.html:
+          cache: false
+    metrics:
+      - reports/data_validation_metrics.json:
+          cache: false
+
+  prepare_data:
+    cmd: python src/data/prepare.py --config config/params.yaml
+    deps:
+      - src/data/prepare.py
+      - data/raw
+      - config/params.yaml
+    outs:
+      - data/processed:
+          persist: true
+    params:
+      - prepare.test_split
+      - prepare.seed
+      - prepare.normalize
+
+  feature_engineering:
+    cmd: python src/features/build_features.py --config config/params.yaml
+    deps:
+      - src/features/build_features.py
+      - data/processed
+      - config/params.yaml
+    outs:
+      - data/features:
+          persist: true
+    params:
+      - features.engineering.polynomial_degree
+      - features.engineering.interaction_only
+      - features.selection.method
+      - features.selection.k_best
+
+  train_model:
+    cmd: python src/models/train.py --config config/params.yaml
+    deps:
+      - src/models/train.py
+      - data/features
+      - config/params.yaml
+    outs:
+      - models/model.pkl:
+          persist: true
+      - models/preprocessor.pkl:
+          persist: true
+    params:
+      - model.type
+      - model.hyperparameters
+      - training.batch_size
+      - training.epochs
+      - training.learning_rate
+    metrics:
+      - reports/training_metrics.json:
+          cache: false
+    plots:
+      - reports/figures/training_history.json:
+          template: linear
+          x: epoch
+          y: loss
+      - reports/figures/confusion_matrix.json:
+          template: confusion
+          x: actual
+          y: predicted
+
+  evaluate_model:
+    cmd: python src/models/evaluate.py --config config/params.yaml
+    deps:
+      - src/models/evaluate.py
+      - models/model.pkl
+      - data/features/test.pkl
+      - config/params.yaml
+    metrics:
+      - reports/evaluation_metrics.json:
+          cache: false
+    plots:
+      - reports/figures/roc_curve.json:
+          template: linear
+          x: fpr
+          y: tpr
+          title: ROC Curve
+      - reports/figures/precision_recall.json:
+          template: linear
+          x: recall
+          y: precision
+          title: Precision-Recall Curve
+
+  {% if cookiecutter.include_model_monitoring == 'yes' -%}
+  monitor_model:
+    cmd: python src/monitoring/drift_detection.py --config config/params.yaml
+    deps:
+      - src/monitoring/drift_detection.py
+      - models/model.pkl
+      - data/features
+      - data/monitoring
+    outs:
+      - reports/monitoring/drift_report.html:
+          cache: false
+      - reports/monitoring/performance_report.html:
+          cache: false
+    metrics:
+      - reports/monitoring/drift_metrics.json:
+          cache: false
+  {% endif %}
+
+  {% if cookiecutter.include_api_service == 'yes' -%}
+  test_api:
+    cmd: pytest tests/api -v --cov=src.api --cov-report=html:reports/coverage/api
+    deps:
+      - src/api
+      - tests/api
+      - models/model.pkl
+    outs:
+      - reports/coverage/api:
+          cache: false
+  {% endif %}
+
+  export_model:
+    cmd: python src/models/export.py --config config/params.yaml
+    deps:
+      - src/models/export.py
+      - models/model.pkl
+      - models/preprocessor.pkl
+      - config/params.yaml
+    outs:
+      - models/exported:
+          persist: true

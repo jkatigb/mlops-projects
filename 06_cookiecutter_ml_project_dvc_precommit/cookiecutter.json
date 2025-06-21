@@ -1,0 +1,33 @@
+{
+  "project_name": "My ML Project",
+  "project_slug": "{{ cookiecutter.project_name.lower().replace(' ', '_').replace('-', '_') }}",
+  "author_name": "Your Name",
+  "author_email": "your.email@example.com",
+  "description": "A short description of the project.",
+  "python_version": ["3.10", "3.11", "3.12"],
+  "open_source_license": ["MIT", "Apache-2.0", "BSD-3-Clause", "GPL-3.0", "Proprietary"],
+  "dvc_remote_type": ["s3", "gs", "azure", "local", "none"],
+  "dvc_remote_url": "s3://my-bucket/path/to/dvc",
+  "use_docker": ["yes", "no"],
+  "use_mlflow": ["yes", "no"],
+  "use_wandb": ["yes", "no"],
+  "cloud_provider": ["aws", "gcp", "azure", "none"],
+  "include_gpu_support": ["yes", "no"],
+  "include_data_validation": ["yes", "no"],
+  "include_model_monitoring": ["yes", "no"],
+  "include_api_service": ["yes", "no"],
+  "ci_tool": ["github", "gitlab", "jenkins", "circleci"],
+  "container_registry": ["dockerhub", "ecr", "gcr", "acr", "none"],
+  "_copy_without_render": [
+    "*.jpg",
+    "*.png",
+    "*.gif",
+    "*.ico",
+    "*.svg",
+    "*.eot",
+    "*.otf",
+    "*.ttf",
+    "*.woff",
+    "*.woff2"
+  ]
+}

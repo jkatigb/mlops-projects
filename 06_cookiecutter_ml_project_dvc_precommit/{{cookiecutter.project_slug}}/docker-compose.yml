@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  # Jupyter Lab for development
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/workspace
+      - ~/.aws:/home/mluser/.aws:ro  # AWS credentials
+      - ~/.config/gcloud:/home/mluser/.config/gcloud:ro  # GCP credentials
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-your-jupyter-token}
+    command: >
+      jupyter lab --ip=0.0.0.0 --port=8888 --no-browser
+      --allow-root --NotebookApp.token=${JUPYTER_TOKEN:-your-jupyter-token}
+
+  {% if cookiecutter.use_mlflow == 'yes' -%}
+  # MLflow tracking server
+  mlflow:
+    image: python:{{cookiecutter.python_version}}-slim
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlruns
+      - ./mlflow.db:/mlflow.db
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlruns
+    command: >
+      bash -c "pip install mlflow boto3 && 
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:///mlflow.db
+      --default-artifact-root /mlruns"
+  {% endif -%}
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=mluser
+      - POSTGRES_PASSWORD=mlpassword
+      - POSTGRES_DB={{cookiecutter.project_slug}}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  {% if cookiecutter.include_api_service == 'yes' -%}
+  # API service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models:ro
+      - ./config:/app/config:ro
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - DATABASE_URL=postgresql://mluser:mlpassword@postgres:5432/{{cookiecutter.project_slug}}
+      - REDIS_URL=redis://redis:6379/0
+      {% if cookiecutter.use_mlflow == 'yes' -%}
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      {% endif -%}
+    depends_on:
+      - postgres
+      - redis
+      {% if cookiecutter.use_mlflow == 'yes' -%}
+      - mlflow
+      {% endif -%}
+    command: >
+      uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+  {% endif -%}
+
+  {% if cookiecutter.include_model_monitoring == 'yes' -%}
+  # Grafana for monitoring dashboards
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+  {% endif -%}
+
+volumes:
+  postgres_data:
+  redis_data:
+  {% if cookiecutter.include_model_monitoring == 'yes' -%}
+  grafana_data:
+  prometheus_data:
+  {% endif -%}
+
+networks:
+  default:
+    name: {{cookiecutter.project_slug}}_network
