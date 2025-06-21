@@ -1,0 +1,10 @@
+{
+  "type": "record",
+  "name": "RawReading",
+  "namespace": "com.example",
+  "fields": [
+    {"name": "sensor_id", "type": "string"},
+    {"name": "timestamp", "type": "long"},
+    {"name": "value", "type": "double"}
+  ]
+}

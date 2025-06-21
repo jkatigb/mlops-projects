@@ -1,0 +1,9 @@
+project: feature_pipeline
+registry: data/registry.db
+provider: local
+online_store:
+  type: redis
+  connection_string: "redis:6379"
+offline_store:
+  type: file
+  path: ./data/offline.parquet

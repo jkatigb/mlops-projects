@@ -1,0 +1,17 @@
+{
+  "title": "Feature Pipeline Monitoring",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Kafka Ingestion Lag",
+      "targets": [],
+      "datasource": "Prometheus"
+    },
+    {
+      "type": "graph",
+      "title": "Redis Latency",
+      "targets": [],
+      "datasource": "Prometheus"
+    }
+  ]
+}

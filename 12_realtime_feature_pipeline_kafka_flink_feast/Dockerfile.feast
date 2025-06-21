@@ -1,0 +1,31 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy feature repository
+COPY feature_repo /app/feature_repo
+
+# Create data directory for registry
+RUN mkdir -p /app/data
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV FEAST_USAGE=false
+
+# Expose ports
+EXPOSE 8080 6566
+
+# Start Feast feature server
+CMD ["feast", "serve", "-h", "0.0.0.0", "-p", "6566", "--feature_repo", "/app/feature_repo"]
