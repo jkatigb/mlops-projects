@@ -1,19 +1,234 @@
-name: CI
-on: [push, pull_request]
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+
+env:
+  PYTHON_VERSION: '{{cookiecutter.python_version}}'
+  {% if cookiecutter.dvc_remote_type == 's3' -%}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  {% elif cookiecutter.dvc_remote_type == 'gs' -%}
+  GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+  {% elif cookiecutter.dvc_remote_type == 'azure' -%}
+  AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+  {% endif -%}
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12']
+    
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          python-version: {{cookiecutter.python_version}}
+          fetch-depth: 0  # Full history for better blame info
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/pre-commit
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install dvc
-      - name: Pull data
-        run: dvc pull
-      - name: Run tests
-        run: pytest -q
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -e ".[dev]"
+          pip install dvc[{{cookiecutter.dvc_remote_type}}]
+
+      - name: Run pre-commit hooks
+        uses: pre-commit/action@v3.0.0
+
+      - name: Run security checks
+        run: |
+          bandit -r src/ -f json -o reports/bandit.json
+          safety check --json --output reports/safety.json
+
+      - name: Run type checking
+        run: mypy src/
+
+      - name: Run tests with coverage
+        run: |
+          pytest -v --cov=src --cov-report=xml --cov-report=html --cov-report=term-missing
+          
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}
+
+  ml-pipeline:
+    name: ML Pipeline Validation
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Configure DVC
+        run: |
+          pip install dvc[{{cookiecutter.dvc_remote_type}}]
+          {% if cookiecutter.dvc_remote_type == 's3' -%}
+          dvc remote modify origin access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          dvc remote modify origin secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          {% elif cookiecutter.dvc_remote_type == 'gs' -%}
+          echo '${{ secrets.GCP_CREDENTIALS }}' > gcp-key.json
+          dvc remote modify origin credentialpath gcp-key.json
+          {% endif -%}
+
+      - name: DVC Pull
+        run: |
+          dvc pull -v
+          dvc status
+
+      - name: Run ML Pipeline
+        run: |
+          dvc repro --dry
+          dvc metrics show
+          dvc plots show
+
+      - name: CML Report
+        if: github.event_name == 'pull_request'
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pip install cml
+          echo "## ML Pipeline Report" >> report.md
+          echo "### Metrics" >> report.md
+          dvc metrics show --md >> report.md
+          echo "### Plots" >> report.md
+          dvc plots diff --target reports/figures --md >> report.md
+          cml comment create report.md
+
+  build-and-push:
+    name: Build and Push Docker Image
+    needs: [lint-and-test, ml-pipeline]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          {% if cookiecutter.container_registry == 'dockerhub' -%}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          {% elif cookiecutter.container_registry == 'ecr' -%}
+          registry: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          {% elif cookiecutter.container_registry == 'gcr' -%}
+          registry: gcr.io
+          username: _json_key
+          password: ${{ secrets.GCP_CREDENTIALS }}
+          {% elif cookiecutter.container_registry == 'acr' -%}
+          registry: ${{ secrets.AZURE_REGISTRY_NAME }}.azurecr.io
+          username: ${{ secrets.AZURE_CLIENT_ID }}
+          password: ${{ secrets.AZURE_CLIENT_SECRET }}
+          {% endif -%}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            {% if cookiecutter.container_registry == 'dockerhub' -%}
+            ${{ secrets.DOCKER_USERNAME }}/{{cookiecutter.project_slug}}
+            {% elif cookiecutter.container_registry == 'ecr' -%}
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/{{cookiecutter.project_slug}}
+            {% elif cookiecutter.container_registry == 'gcr' -%}
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/{{cookiecutter.project_slug}}
+            {% elif cookiecutter.container_registry == 'acr' -%}
+            ${{ secrets.AZURE_REGISTRY_NAME }}.azurecr.io/{{cookiecutter.project_slug}}
+            {% endif -%}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  security-scan:
+    name: Security Scanning
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.build-and-push.outputs.image }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  deploy:
+    name: Deploy to Production
+    needs: [build-and-push, security-scan]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Cloud Platform
+        run: |
+          echo "Deploying version ${{ github.ref_name }} to production"
+          # Add deployment scripts here based on cloud provider

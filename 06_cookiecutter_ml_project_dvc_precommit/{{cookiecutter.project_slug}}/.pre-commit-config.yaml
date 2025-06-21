@@ -1,18 +1,125 @@
+default_language_version:
+  python: python{{cookiecutter.python_version}}
+
 repos:
+  # Basic formatting and linting
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=5000']
+      - id: check-ast
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: check-executables-have-shebangs
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: check-xml
+      - id: check-yaml
+        args: ['--allow-multiple-documents']
+      - id: debug-statements
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+      - id: name-tests-test
+        args: ['--pytest-test-first']
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
+
+  # Python code formatting
   - repo: https://github.com/psf/black
-    rev: 23.1.0
+    rev: 23.12.1
     hooks:
       - id: black
-  - repo: https://github.com/pre-commit/mirrors-isort
-    rev: v5.12.0
+        language_version: python{{cookiecutter.python_version}}
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
     hooks:
       - id: isort
+        args: ["--profile", "black"]
+
+  # Python code quality
   - repo: https://github.com/pycqa/flake8
-    rev: 6.0.0
+    rev: 7.0.0
     hooks:
       - id: flake8
-  - repo: https://github.com/iterative/dvc
-    rev: 2.59.1
+        additional_dependencies: 
+          - flake8-docstrings
+          - flake8-bugbear
+          - flake8-comprehensions
+          - flake8-simplify
+        args: ['--max-line-length=88', '--extend-ignore=E203,W503,D100,D101,D102']
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
     hooks:
-      - id: dvc-precommit
+      - id: mypy
+        additional_dependencies: [types-all]
+        args: ['--config-file=pyproject.toml']
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        args: ['-c', 'pyproject.toml']
+        exclude: ^tests/
+
+  - repo: https://github.com/pyupio/safety
+    rev: v3.0.1
+    hooks:
+      - id: safety
+        args: ['check', '--json']
+
+  # Secrets detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+
+  # DVC checks
+  - repo: https://github.com/iterative/dvc
+    rev: 3.39.0
+    hooks:
+      - id: dvc-pre-commit
+        language_version: python{{cookiecutter.python_version}}
         stages: [commit]
+      - id: dvc-pre-push
+        language_version: python{{cookiecutter.python_version}}
+        stages: [push]
+      - id: dvc-post-checkout
+        language_version: python{{cookiecutter.python_version}}
+        stages: [post-checkout]
+        always_run: true
+
+  # Jupyter notebook cleaning
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.6.1
+    hooks:
+      - id: nbstripout
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        args: ['-d', '{extends: relaxed, rules: {line-length: {max: 120}}}']
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        args: ['--fix']
+
+  # Commit message linting
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.13.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
