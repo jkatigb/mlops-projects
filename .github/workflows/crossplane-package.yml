@@ -31,7 +31,7 @@ jobs:
         run: |
           curl -sL https://raw.githubusercontent.com/crossplane/crossplane/master/install.sh | sh
           sudo mv crossplane /usr/local/bin/
-          crossplane --version
+          crossplane version --client
           
       - name: Validate configuration
         run: |
@@ -40,20 +40,20 @@ jobs:
           
       - name: Build configuration package
         run: |
-          crossplane build configuration \
+          crossplane xpkg build \
             --name ${PACKAGE_NAME} \
             --ignore ".github/,*.md" \
-            ./10_multicloud_ml_platform_crossplane
+            -f ./10_multicloud_ml_platform_crossplane
             
       - name: Push package (main branch only)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
-          crossplane push configuration \
+          crossplane xpkg push \
             ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:${GITHUB_SHA:0:8} \
             --token="${UPBOUND_TOKEN}"
           
-          crossplane push configuration \
+          crossplane xpkg push \
             ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:latest \
             --token="${UPBOUND_TOKEN}"
