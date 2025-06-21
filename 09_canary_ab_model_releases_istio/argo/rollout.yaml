@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: iris-rollout
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: iris-model
+  template:
+    metadata:
+      labels:
+        app: iris-model
+    spec:
+      containers:
+        - name: classifier
+          image: seldonio/sklearnserver:1.14.0
+          imagePullPolicy: IfNotPresent
+  strategy:
+    canary:
+      steps:
+        - setWeight: 10
+        - pause: {duration: 2m}
+        - analysis:
+            templates:
+              - templateName: iris-success-rate
+            args:
+              - name: service-name
+                value: iris-model
+        - setWeight: 50
+        - pause: {duration: 2m}
+        - analysis:
+            templates:
+              - templateName: iris-success-rate
+            args:
+              - name: service-name
+                value: iris-model
+        - setWeight: 100
