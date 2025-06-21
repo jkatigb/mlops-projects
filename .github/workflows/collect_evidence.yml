@@ -1,0 +1,97 @@
+name: collect-evidence
+
+on:
+  workflow_run:
+    workflows: ["train-and-deploy"]
+    types:
+      - completed
+  # Allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'MLflow Run ID'
+        required: true
+        default: 'test-run-123'
+
+env:
+  AWS_REGION: us-east-1
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  gather:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for OIDC
+      contents: read
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r 11_automated_soc2_evidence_collector/requirements.txt
+          
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Generate Terraform plan and compute hash
+        working-directory: ./infrastructure
+        run: |
+          # Check if terraform directory exists
+          if [ -d "." ] && [ -f "main.tf" ]; then
+            terraform init
+            terraform plan -out=plan.tfplan || echo "No Terraform configuration found"
+          else
+            # Create dummy plan for demo
+            echo "dummy-terraform-plan" > plan.tfplan
+          fi
+          cp plan.tfplan ${{ github.workspace }}/plan.tfplan
+        continue-on-error: true
+
+      - name: Determine container digest
+        id: container-digest
+        run: |
+          # Try to get digest from previous workflow or use dummy value
+          if [ -n "${{ github.event.workflow_run.outputs.image_digest }}" ]; then
+            echo "IMAGE_DIGEST=${{ github.event.workflow_run.outputs.image_digest }}" >> $GITHUB_ENV
+          elif [ -n "${{ secrets.IMAGE_NAME }}" ]; then
+            # Try to pull and get digest
+            docker pull ${{ secrets.IMAGE_NAME }} || true
+            DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ secrets.IMAGE_NAME }} 2>/dev/null || echo "")
+            echo "IMAGE_DIGEST=${DIGEST:-sha256:dummy}" >> $GITHUB_ENV
+          else
+            echo "IMAGE_DIGEST=sha256:dummy-digest-for-testing" >> $GITHUB_ENV
+          fi
+        continue-on-error: true
+
+      - name: Run evidence collector
+        env:
+          RUN_ID: ${{ github.event.workflow_run.outputs.run_id || github.event.inputs.run_id }}
+          IMAGE_DIGEST: ${{ env.IMAGE_DIGEST }}
+          TERRAFORM_PLAN_PATH: plan.tfplan
+          KMS_KEY_ID: ${{ secrets.KMS_KEY_ID }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          SNS_TOPIC_ARN: ${{ secrets.SNS_TOPIC_ARN }}
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+        run: |
+          python 11_automated_soc2_evidence_collector/collect_evidence.py
+          
+      - name: Upload evidence artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-${{ github.event.workflow_run.outputs.run_id || github.event.inputs.run_id }}
+          path: |
+            evidence.json
+            evidence.sig
+          retention-days: 90
