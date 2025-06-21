@@ -2,21 +2,58 @@ name: crossplane-packages
 
 on:
   push:
+    branches: [main]
+    paths:
+      - '10_multicloud_ml_platform_crossplane/**'
+      - '.github/workflows/crossplane-package.yml'
+  pull_request:
     paths:
       - '10_multicloud_ml_platform_crossplane/**'
       - '.github/workflows/crossplane-package.yml'
 
+env:
+  CROSSPLANE_VERSION: v1.15.0
+  REGISTRY: xpkg.upbound.io
+  ORGANIZATION: myorg
+  PACKAGE_NAME: platform
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
       - name: Set up Crossplane CLI
         run: |
-          curl -sL https://raw.githubusercontent.com/crossplane/crossplane/master/install.sh | sh
-      - name: Build packages
-        run: kubectl crossplane build configuration ./10_multicloud_ml_platform_crossplane
-      - name: Push packages
+          curl -sL https://raw.githubusercontent.com/crossplane/crossplane/release-${CROSSPLANE_VERSION}/install.sh | sh
+          sudo mv kubectl-crossplane /usr/local/bin/
+          kubectl crossplane --version
+          
+      - name: Validate configuration
+        run: |
+          find ./10_multicloud_ml_platform_crossplane -name "*.yaml" -o -name "*.yml" | \
+            xargs kubectl --dry-run=client apply -f
+          
+      - name: Build configuration package
+        run: |
+          kubectl crossplane build configuration \
+            --name ${PACKAGE_NAME} \
+            --ignore ".github/,*.md" \
+            ./10_multicloud_ml_platform_crossplane
+            
+      - name: Push package (main branch only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
-        run: kubectl crossplane push configuration xpkg.upbound.io/myorg/platform:latest
+        run: |
+          kubectl crossplane push configuration \
+            ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:${GITHUB_SHA:0:8} \
+            --token="${UPBOUND_TOKEN}"
+          
+          kubectl crossplane push configuration \
+            ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:latest \
+            --token="${UPBOUND_TOKEN}"

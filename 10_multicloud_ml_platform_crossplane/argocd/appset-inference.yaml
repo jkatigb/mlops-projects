@@ -3,25 +3,82 @@ kind: ApplicationSet
 metadata:
   name: inference-service
   namespace: argocd
+  labels:
+    app.kubernetes.io/name: inference-service
+    app.kubernetes.io/part-of: ml-platform
 spec:
   generators:
-    - list:
-        elements:
-          - cluster: prod-us
-            url: https://kubernetes.default.svc
-          - cluster: prod-eu
-            url: https://kubernetes.default.svc
+    - clusters:
+        selector:
+          matchLabels:
+            environment: production
+            argocd.argoproj.io/secret-type: cluster
   template:
     metadata:
-      name: '{{cluster}}-inference'
+      name: '{{name}}-inference'
+      labels:
+        app.kubernetes.io/name: inference
+        app.kubernetes.io/instance: '{{name}}'
+        cluster: '{{name}}'
+        provider: '{{metadata.labels.provider}}'
+        region: '{{metadata.labels.region}}'
     spec:
       project: default
       source:
-        repoURL: https://github.com/orbis/mlops-projects.git
+        repoURL: https://github.com/jkatigb/mlops-projects.git
         targetRevision: HEAD
         path: 13_reusable_helm_chart_model_serving/chart
+        helm:
+          releaseName: inference
+          values: |
+            replicaCount: 3
+            image:
+              repository: gcr.io/ml-platform/inference
+              tag: latest
+              pullPolicy: IfNotPresent
+            service:
+              type: LoadBalancer
+              port: 80
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                cpu: 2000m
+                memory: 4Gi
+            autoscaling:
+              enabled: true
+              minReplicas: 3
+              maxReplicas: 10
+              targetCPUUtilizationPercentage: 70
+            monitoring:
+              enabled: true
+              serviceMonitor:
+                enabled: true
+            affinity:
+              podAntiAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: inference
+                    topologyKey: kubernetes.io/hostname
       destination:
-        server: '{{url}}'
+        server: '{{server}}'
         namespace: inference
       syncPolicy:
-        automated: {}
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground
+          - ApplyOutOfSyncOnly=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m

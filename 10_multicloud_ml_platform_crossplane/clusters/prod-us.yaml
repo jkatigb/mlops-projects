@@ -2,8 +2,27 @@ apiVersion: platform.orbis.dev/v1alpha1
 kind: Cluster
 metadata:
   name: prod-us
+  namespace: default
+  labels:
+    environment: production
+    region: us-east-1
+    provider: aws
 spec:
   compositionRef:
-    name: standard-xcluster
+    name: aws-xcluster
   parameters:
+    provider: aws
     region: us-east-1
+    nodeCount: 3
+    nodeSize: medium
+    kubernetesVersion: v1.28.0
+    networkCIDR: 10.0.0.0/16
+    enableLogging: true
+    enableMonitoring: true
+    tags:
+      Environment: production
+      ManagedBy: crossplane
+      Project: ml-platform
+  writeConnectionSecretToRef:
+    name: prod-us-kubeconfig
+    namespace: crossplane-system

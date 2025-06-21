@@ -2,16 +2,24 @@ apiVersion: apiextensions.crossplane.io/v1
 kind: CompositeResourceDefinition
 metadata:
   name: xclusters.platform.orbis.dev
+  annotations:
+    description: "Multi-cloud Kubernetes cluster abstraction for ML workloads"
 spec:
   group: platform.orbis.dev
   names:
     kind: XCluster
     plural: xclusters
+    singular: xcluster
+    listKind: XClusterList
   claimNames:
     kind: Cluster
     plural: clusters
+    singular: cluster
+    listKind: ClusterList
   connectionSecretKeys:
     - kubeconfig
+    - endpoint
+    - clusterCA
   versions:
     - name: v1alpha1
       served: true
@@ -22,8 +30,63 @@ spec:
           properties:
             spec:
               type: object
+              description: "XCluster specification"
               properties:
+                provider:
+                  type: string
+                  description: "Cloud provider (aws or gcp)"
+                  enum: ["aws", "gcp"]
                 region:
                   type: string
+                  description: "Cloud region for the cluster"
+                  minLength: 1
+                nodeCount:
+                  type: integer
+                  description: "Number of worker nodes"
+                  minimum: 1
+                  maximum: 100
+                  default: 3
+                nodeSize:
+                  type: string
+                  description: "Size of worker nodes"
+                  enum: ["small", "medium", "large", "xlarge"]
+                  default: "medium"
+                kubernetesVersion:
+                  type: string
+                  description: "Kubernetes version"
+                  pattern: "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+                  default: "v1.28.0"
+                networkCIDR:
+                  type: string
+                  description: "VPC CIDR block"
+                  pattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$"
+                  default: "10.0.0.0/16"
+                enableLogging:
+                  type: boolean
+                  description: "Enable cluster logging"
+                  default: true
+                enableMonitoring:
+                  type: boolean
+                  description: "Enable cluster monitoring"
+                  default: true
+                tags:
+                  type: object
+                  description: "Resource tags"
+                  additionalProperties:
+                    type: string
               required:
+                - provider
                 - region
+            status:
+              type: object
+              properties:
+                ready:
+                  type: boolean
+                  description: "Cluster readiness status"
+                phase:
+                  type: string
+                  description: "Current phase of cluster provisioning"
+                  enum: ["Pending", "Creating", "Ready", "Failed", "Deleting"]
+                message:
+                  type: string
+                  description: "Human-readable status message"

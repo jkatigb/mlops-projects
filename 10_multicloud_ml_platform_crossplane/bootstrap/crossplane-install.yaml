@@ -2,18 +2,61 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: crossplane-system
+  labels:
+    control-plane: crossplane
 ---
-apiVersion: helm.crossplane.io/v1beta1
-kind: Release
+# Install Crossplane using Helm
+apiVersion: v1
+kind: ServiceAccount
 metadata:
-  name: crossplane
+  name: crossplane-installer
+  namespace: crossplane-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: crossplane-installer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: crossplane-installer
+  namespace: crossplane-system
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: install-crossplane
   namespace: crossplane-system
 spec:
-  chart:
-    repository: https://charts.crossplane.io/stable
-    name: crossplane
-    version: 1.14.0
-  namespace: crossplane-system
-  install:
-    remediation:
-      retries: 3
+  template:
+    spec:
+      serviceAccountName: crossplane-installer
+      containers:
+      - name: helm
+        image: alpine/helm:3.13.0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          helm repo add crossplane-stable https://charts.crossplane.io/stable
+          helm repo update
+          helm upgrade --install crossplane \
+            --namespace crossplane-system \
+            --create-namespace \
+            --version 1.15.0 \
+            --wait \
+            --set args='{"--enable-composition-functions","--enable-environment-configs"}' \
+            --set resourcesCrossplane.limits.cpu=1 \
+            --set resourcesCrossplane.limits.memory=2Gi \
+            --set resourcesCrossplane.requests.cpu=500m \
+            --set resourcesCrossplane.requests.memory=1Gi \
+            --set resourcesRBACManager.limits.cpu=500m \
+            --set resourcesRBACManager.limits.memory=768Mi \
+            --set resourcesRBACManager.requests.cpu=100m \
+            --set resourcesRBACManager.requests.memory=256Mi \
+            --set metrics.enabled=true \
+            crossplane-stable/crossplane
+      restartPolicy: OnFailure
