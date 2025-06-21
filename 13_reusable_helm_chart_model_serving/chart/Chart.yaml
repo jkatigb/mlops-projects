@@ -1,0 +1,18 @@
+apiVersion: v2
+name: model-serving
+version: 0.1.0
+appVersion: "1.0"
+description: A reusable Helm chart for containerised ML model serving
+type: application
+keywords:
+  - machine-learning
+  - model-serving
+  - ai
+  - ml-ops
+maintainers:
+  - name: MLOps Team
+    email: mlops@example.com
+home: https://github.com/jkatigb/mlops-projects
+sources:
+  - https://github.com/jkatigb/mlops-projects/tree/main/13_reusable_helm_chart_model_serving
+icon: https://raw.githubusercontent.com/kubernetes/community/master/icons/svg/resources/labeled/pod.svg

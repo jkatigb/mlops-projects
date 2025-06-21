@@ -13,19 +13,35 @@ Copy-pasting YAML across projects leads to drift and mistakes. A reusable chart 
 * HorizontalPodAutoscaler
 
 ## Task Checklist
-- [ ] Chart skeleton (`Chart.yaml`, `values.yaml`, `templates/`)  
-- [ ] Template parameters:
-  - [ ] `image.repository`, `tag`, `resource.limits`  
-  - [ ] `gpu.enabled` (nodeSelector + tolerations)  
-  - [ ] `autoscaling.enabled`, `minReplicas`, `maxReplicas`, `targetCPU`  
-  - [ ] `prometheus.scrape` annotations  
-  - [ ] `service.type` (ClusterIP/LoadBalancer)  
-- [ ] CI job to run `helm lint` + `helm template`  
-- [ ] Example `values-fastapi.yaml` for toy model  
-- [ ] README section on installing & upgrading  
+- [x] Chart skeleton (`Chart.yaml`, `values.yaml`, `templates/`)
+- [x] Template parameters:
+  - [x] `image.repository`, `tag`, `resource.limits`
+  - [x] `gpu.enabled` (nodeSelector + tolerations)
+  - [x] `autoscaling.enabled`, `minReplicas`, `maxReplicas`, `targetCPU`
+  - [x] `prometheus.scrape` annotations
+  - [x] `service.type` (ClusterIP/LoadBalancer)
+- [x] CI job to run `helm lint` + `helm template`
+- [x] Example `values-fastapi.yaml` for toy model
+- [x] README section on installing & upgrading
 
 ## Quick Start
 ```bash
 helm repo add mlops https://yourbucket.github.io/charts
 helm install iris mlops/model-serving -f examples/values-iris.yaml
-``` 
+```
+
+## Install
+
+Clone the repo and install the chart with the example values:
+
+```bash
+helm install my-model ./chart -f examples/values-fastapi.yaml
+```
+
+## Upgrade
+
+Update the release with any configuration changes:
+
+```bash
+helm upgrade my-model ./chart -f examples/values-fastapi.yaml
+```
