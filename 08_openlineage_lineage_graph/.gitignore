@@ -1,0 +1,31 @@
+# Airflow
+logs/
+*.pyc
+__pycache__/
+.airflow/
+airflow.db
+webserver_config.py
+
+# Environment
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes (local testing)
+pgdata/
+airflow-logs/
+
+# Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
