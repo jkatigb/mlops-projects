@@ -1,0 +1,10 @@
+apache-flink>=1.14.0
+apache-flink-libraries>=1.14.0
+feast>=0.30.0
+redis>=4.5.0
+kafka-python>=2.0.2
+pandas>=1.5.0
+numpy>=1.20.0
+pytest>=7.0.0
+avro-python3>=1.11.0
+prometheus-client>=0.16.0
