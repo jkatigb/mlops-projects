@@ -10,3 +10,4 @@ __pycache__/
 *.tfstate
 *.tfstate.backup
 *.tfvars
+08_openlineage_lineage_graph/.env
