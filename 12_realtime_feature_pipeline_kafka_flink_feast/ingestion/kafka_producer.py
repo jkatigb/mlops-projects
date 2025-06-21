@@ -11,6 +11,7 @@ import time
 import random
 import argparse
 import logging
+import math
 from datetime import datetime
 from typing import Dict, Any
 from kafka import KafkaProducer
@@ -68,7 +69,7 @@ class SensorDataProducer:
         # Simulate temperature sensor with some noise
         base_temp = 20.0 + (hash(sensor_id) % 10)  # Different base for each sensor
         noise = random.gauss(0, 2)  # Random noise
-        value = base_temp + noise + 5 * random.sin(time.time() / 100)  # Time-based variation
+        value = base_temp + noise + 5 * math.sin(time.time() / 100)  # Time-based variation
         
         return {
             'sensor_id': sensor_id,
