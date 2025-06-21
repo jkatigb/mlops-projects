@@ -11,6 +11,7 @@ from kafka.errors import KafkaError
 import redis
 from datetime import datetime
 import logging
+import random
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
