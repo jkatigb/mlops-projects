@@ -30,8 +30,8 @@ jobs:
       - name: Set up Crossplane CLI
         run: |
           curl -sL https://raw.githubusercontent.com/crossplane/crossplane/master/install.sh | sh
-          sudo mv kubectl-crossplane /usr/local/bin/
-          kubectl crossplane --version
+          sudo mv crossplane /usr/local/bin/
+          crossplane version
           
       - name: Validate configuration
         run: |
@@ -40,7 +40,7 @@ jobs:
           
       - name: Build configuration package
         run: |
-          kubectl crossplane build configuration \
+          crossplane build configuration \
             --name ${PACKAGE_NAME} \
             --ignore ".github/,*.md" \
             ./10_multicloud_ml_platform_crossplane
@@ -50,10 +50,10 @@ jobs:
         env:
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
-          kubectl crossplane push configuration \
+          crossplane push configuration \
             ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:${GITHUB_SHA:0:8} \
             --token="${UPBOUND_TOKEN}"
           
-          kubectl crossplane push configuration \
+          crossplane push configuration \
             ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:latest \
             --token="${UPBOUND_TOKEN}"
