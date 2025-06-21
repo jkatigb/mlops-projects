@@ -43,19 +43,22 @@ jobs:
       - name: Build configuration package
         run: |
           crossplane xpkg build \
-            --name ${PACKAGE_NAME} \
-            --ignore ".github/,*.md" \
-            -f ./10_multicloud_ml_platform_crossplane
+            --package-root=./10_multicloud_ml_platform_crossplane \
+            --ignore=".github/,*.md"
             
       - name: Push package (main branch only)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           UPBOUND_TOKEN: ${{ secrets.UPBOUND_TOKEN }}
         run: |
-          crossplane xpkg push \
-            ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:${GITHUB_SHA:0:8} \
-            --token="${UPBOUND_TOKEN}"
+          # Find the generated package file
+          PACKAGE_FILE=$(find ./10_multicloud_ml_platform_crossplane -name "*.xpkg" | head -1)
+          echo "Package file: $PACKAGE_FILE"
           
           crossplane xpkg push \
-            ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:latest \
-            --token="${UPBOUND_TOKEN}"
+            --package-files="$PACKAGE_FILE" \
+            ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:${GITHUB_SHA:0:8}
+          
+          crossplane xpkg push \
+            --package-files="$PACKAGE_FILE" \
+            ${REGISTRY}/${ORGANIZATION}/${PACKAGE_NAME}:latest
