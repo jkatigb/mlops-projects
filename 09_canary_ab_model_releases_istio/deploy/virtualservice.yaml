@@ -2,10 +2,20 @@ apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
   name: iris-model
+  namespace: default
 spec:
   hosts:
     - iris-model
+    - iris-model.default.svc.cluster.local
   http:
+    - match:
+        - headers:
+            x-version:
+              exact: v2
+      route:
+        - destination:
+            host: iris-model
+            subset: v2
     - route:
         - destination:
             host: iris-model
@@ -15,3 +25,7 @@ spec:
             host: iris-model
             subset: v2
           weight: 10
+      timeout: 10s
+      retries:
+        attempts: 3
+        perTryTimeout: 3s

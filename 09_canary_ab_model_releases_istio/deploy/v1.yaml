@@ -1,19 +1,29 @@
 apiVersion: machinelearning.seldon.io/v1
 kind: SeldonDeployment
 metadata:
-  name: iris-model
+  name: iris-model-v1
+  namespace: default
   labels:
+    app: iris-model
     version: v1
 spec:
   predictors:
     - name: iris-predictor
-      replicas: 1
+      replicas: 2
       graph:
         name: classifier
         implementation: SKLEARN_SERVER
-        modelUri: gs://models/iris/v1
+        modelUri: gs://seldon-models/v2/sklearn/iris
       componentSpecs:
         - spec:
             containers:
               - name: classifier
                 image: seldonio/sklearnserver:1.14.0
+                imagePullPolicy: IfNotPresent
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 100Mi
+                  limits:
+                    cpu: 500m
+                    memory: 500Mi

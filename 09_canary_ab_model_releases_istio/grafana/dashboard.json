@@ -1,21 +1,180 @@
 {
   "dashboard": {
-    "title": "Iris Rollout",
+    "id": null,
+    "uid": null,
+    "title": "ML Model Canary Rollout",
+    "tags": ["istio", "seldon", "canary", "ml"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "5s",
+    "time": {
+      "from": "now-30m",
+      "to": "now"
+    },
     "panels": [
       {
+        "id": 1,
         "type": "graph",
-        "title": "Latency P99",
+        "title": "Request Rate by Version",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
         "targets": [
-          {"expr": "iris_latency_seconds"}
-        ]
+          {
+            "expr": "sum(rate(istio_request_total{destination_service_name=\"iris-model\",response_code=\"200\"}[1m])) by (destination_version)",
+            "refId": "A",
+            "legendFormat": "{{destination_version}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps"
+          }
+        }
       },
       {
+        "id": 2,
         "type": "graph",
-        "title": "Request Volume",
+        "title": "Latency P99 by Version",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
         "targets": [
-          {"expr": "iris_request_count"}
-        ]
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{destination_service_name=\"iris-model\"}[5m])) by (destination_version, le))",
+            "refId": "A",
+            "legendFormat": "{{destination_version}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "type": "stat",
+        "title": "Success Rate by Version",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(istio_request_total{destination_service_name=\"iris-model\",response_code=\"200\"}[5m])) by (destination_version) / sum(rate(istio_request_total{destination_service_name=\"iris-model\"}[5m])) by (destination_version)",
+            "refId": "A",
+            "legendFormat": "{{destination_version}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.95
+                },
+                {
+                  "color": "green",
+                  "value": 0.99
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 4,
+        "type": "bargauge",
+        "title": "Traffic Distribution",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(istio_request_total{destination_service_name=\"iris-model\"}[1m])) by (destination_version)",
+            "refId": "A",
+            "legendFormat": "{{destination_version}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": null
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "basic",
+          "showUnfilled": true
+        }
       }
     ]
-  }
+  },
+  "inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "requires": [
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    }
+  ]
 }

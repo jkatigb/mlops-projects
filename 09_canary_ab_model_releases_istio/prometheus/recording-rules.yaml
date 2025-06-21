@@ -2,11 +2,42 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: iris-model-rules
+  namespace: istio-system
 spec:
   groups:
     - name: iris.rules
+      interval: 30s
       rules:
-        - record: iris_latency_seconds
-          expr: histogram_quantile(0.99, sum(rate(request_latency_seconds_bucket{job="iris-model"}[5m])) by (le))
-        - record: iris_request_count
-          expr: sum(rate(request_total{job="iris-model"}[1m]))
+        # Success rate by version
+        - record: iris:success_rate:5m
+          expr: |
+            sum by (destination_version) (
+              rate(istio_request_total{destination_service_name="iris-model",response_code=~"2.."}[5m])
+            ) / sum by (destination_version) (
+              rate(istio_request_total{destination_service_name="iris-model"}[5m])
+            )
+        
+        # P99 latency by version
+        - record: iris:latency_p99:5m
+          expr: |
+            histogram_quantile(0.99,
+              sum by (destination_version, le) (
+                rate(istio_request_duration_milliseconds_bucket{destination_service_name="iris-model"}[5m])
+              )
+            )
+        
+        # Request rate by version
+        - record: iris:request_rate:1m
+          expr: |
+            sum by (destination_version) (
+              rate(istio_request_total{destination_service_name="iris-model"}[1m])
+            )
+        
+        # Error rate by version
+        - record: iris:error_rate:5m
+          expr: |
+            sum by (destination_version) (
+              rate(istio_request_total{destination_service_name="iris-model",response_code=~"5.."}[5m])
+            ) / sum by (destination_version) (
+              rate(istio_request_total{destination_service_name="iris-model"}[5m])
+            )

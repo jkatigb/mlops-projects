@@ -14,15 +14,15 @@ Teams often replace models in a "big-bang" manner, risking customer impact. Cana
 * Grafana dashboards
 
 ## Task Checklist
-- [x] Install Istio with `istioctl install --set profile=demo`
-- [x] Deploy baseline model (`v1`) via SeldonDeployment
-- [x] Deploy new model (`v2`) and create `VirtualService` traffic split 90/10
-- [x] Load test script to generate requests & metrics
-- [x] Prometheus recording rules for accuracy / latency KPI
-- [x] Alertmanager + Argo Rollouts analysis template for automated rollback
-- [x] Gradually shift traffic 90/10 → 50/50 → 0/100
-- [x] Grafana dashboard to visualise metrics per version
-- [x] Documentation of manual override / abort
+* [x] Install Istio with `istioctl install --set profile=demo`
+* [x] Deploy baseline model (`v1`) via SeldonDeployment
+* [x] Deploy new model (`v2`) and create `VirtualService` traffic split 90/10
+* [x] Load test script to generate requests & metrics
+* [x] Prometheus recording rules for accuracy / latency KPI
+* [x] Alertmanager + Argo Rollouts analysis template for automated rollback
+* [x] Gradually shift traffic 90/10 → 50/50 → 0/100
+* [x] Grafana dashboard to visualise metrics per version
+* [x] Documentation of manual override / abort
 
 ## Demo Flow
 ```bash
