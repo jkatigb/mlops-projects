@@ -1,7 +1,29 @@
-variable "namespace" {}
-variable "service_account_name" {}
-variable "cluster_oidc_provider_arn" {}
-variable "policies" { type = list(string) default = [] }
+variable "namespace" {
+  type        = string
+  description = "Kubernetes namespace for the service account"
+}
+
+variable "service_account_name" {
+  type        = string
+  description = "Name of the Kubernetes service account"
+}
+
+variable "cluster_oidc_provider_arn" {
+  type        = string
+  description = "ARN of the EKS cluster's OIDC provider"
+}
+
+variable "policies" {
+  type        = list(string)
+  default     = []
+  description = "List of IAM policy ARNs to attach to the role"
+}
+
+variable "tags" {
+  type        = map(string)
+  default     = {}
+  description = "Tags to apply to IAM resources"
+}
 
 provider "aws" {}
 
@@ -27,6 +49,7 @@ data "aws_iam_policy_document" "assume" {
 resource "aws_iam_role" "this" {
   name               = "irsa-${var.service_account_name}"
   assume_role_policy = data.aws_iam_policy_document.assume.json
+  tags               = var.tags
 }
 
 resource "aws_iam_role_policy_attachment" "custom" {

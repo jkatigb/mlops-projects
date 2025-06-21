@@ -1,0 +1,315 @@
+# JupyterHub Helm Chart Values
+# For production deployment on EKS with GPU support
+
+hub:
+  # Use JupyterHub 4.x for latest features
+  image:
+    name: quay.io/jupyterhub/k8s-hub
+    tag: "3.3.7"
+  
+  # Security configuration
+  config:
+    # Authentication - Configure based on your needs
+    # Example: GitHub OAuth
+    GitHubOAuthenticator:
+      client_id: "YOUR_GITHUB_CLIENT_ID"
+      client_secret: "YOUR_GITHUB_CLIENT_SECRET"
+      oauth_callback_url: "https://YOUR_DOMAIN/hub/oauth_callback"
+      allowed_organizations:
+        - "your-org"
+      scope:
+        - "read:user"
+        - "user:email"
+        - "read:org"
+    
+    # Use the GitHub authenticator
+    JupyterHub:
+      authenticator_class: github
+      admin_users:
+        - "admin-user1"
+        - "admin-user2"
+    
+    # Spawner configuration for user pods
+    KubeSpawner:
+      # CPU limits and requests
+      cpu_limit: 4
+      cpu_guarantee: 0.5
+      mem_limit: "8G"
+      mem_guarantee: "1G"
+      
+      # Storage configuration
+      storage_type: "dynamic"
+      storage_class: "gp3"
+      storage_capacity: "10Gi"
+      storage_access_modes:
+        - "ReadWriteOnce"
+      
+      # Extra pod configuration
+      extra_labels:
+        hub.jupyter.org/network-access-hub: "true"
+      
+      # Node selector for CPU workloads
+      node_selector:
+        workload: "cpu"
+      
+      # Profile list for different compute options
+      profile_list:
+        - display_name: "Minimal environment (CPU: 0.5, RAM: 1GB)"
+          description: "For lightweight development and testing"
+          default: true
+          kubespawner_override:
+            cpu_guarantee: 0.5
+            cpu_limit: 2
+            mem_guarantee: "1G"
+            mem_limit: "4G"
+        
+        - display_name: "Standard environment (CPU: 2, RAM: 4GB)"
+          description: "For regular data science work"
+          kubespawner_override:
+            cpu_guarantee: 2
+            cpu_limit: 4
+            mem_guarantee: "4G"
+            mem_limit: "8G"
+        
+        - display_name: "Large environment (CPU: 4, RAM: 16GB)"
+          description: "For memory-intensive workloads"
+          kubespawner_override:
+            cpu_guarantee: 4
+            cpu_limit: 8
+            mem_guarantee: "16G"
+            mem_limit: "32G"
+            node_selector:
+              workload: "cpu"
+              node.kubernetes.io/instance-type: "t3.2xlarge"
+        
+        - display_name: "GPU environment (1x Tesla T4)"
+          description: "For deep learning and GPU-accelerated computing"
+          kubespawner_override:
+            cpu_guarantee: 4
+            cpu_limit: 8
+            mem_guarantee: "16G"
+            mem_limit: "32G"
+            node_selector:
+              workload: "gpu"
+            tolerations:
+              - key: "nvidia.com/gpu"
+                operator: "Equal"
+                value: "true"
+                effect: "NoSchedule"
+            extra_resource_limits:
+              nvidia.com/gpu: "1"
+            extra_resource_guarantees:
+              nvidia.com/gpu: "1"
+            image: "quay.io/jupyter/pytorch-notebook:latest"
+      
+      # Environment variables for all spawned pods
+      environment:
+        JUPYTER_ENABLE_LAB: "true"
+        AWS_REGION: "us-west-2"  # Update based on your region
+      
+      # Volume mounts for S3 access
+      extra_containers:
+        - name: s3-mounter
+          image: "public.ecr.aws/eqasim/s3fs-fuse:latest"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              mkdir -p /home/jovyan/s3
+              s3fs $S3_BUCKET /home/jovyan/s3 -o iam_role=auto -o endpoint=$AWS_REGION -o url=https://s3.$AWS_REGION.amazonaws.com
+              tail -f /dev/null
+          env:
+            - name: S3_BUCKET
+              value: "your-jupyterhub-storage-bucket"  # Will be replaced by Terraform
+            - name: AWS_REGION
+              value: "us-west-2"  # Update based on your region
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: fuse
+              mountPath: /dev/fuse
+      
+      extra_volumes:
+        - name: fuse
+          hostPath:
+            path: /dev/fuse
+  
+  # Database configuration (use PostgreSQL for production)
+  db:
+    type: postgres
+    url: postgresql://jupyterhub:password@postgres-service:5432/jupyterhub
+    upgrade: true
+  
+  # Service configuration
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+  
+  # Network policies
+  networkPolicy:
+    enabled: true
+    ingress:
+      - from:
+        - podSelector:
+            matchLabels:
+              hub.jupyter.org/network-access-hub: "true"
+    egress:
+      - to:
+        - podSelector:
+            matchLabels:
+              hub.jupyter.org/network-access-hub: "true"
+      - to:
+        - namespaceSelector: {}
+        ports:
+          - protocol: TCP
+            port: 53  # DNS
+      - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.169.254/32  # Block IMDS access
+
+# Proxy configuration
+proxy:
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+  
+  # Enable HTTPS
+  https:
+    enabled: false  # Enable after setting up cert-manager
+    type: letsencrypt
+    letsencrypt:
+      contactEmail: "admin@example.com"
+      acmeServer: "https://acme-v02.api.letsencrypt.org/directory"
+  
+  # Chp configuration
+  chp:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+# Single-user server configuration
+singleuser:
+  # Default image for users
+  image:
+    name: quay.io/jupyter/datascience-notebook
+    tag: "latest"
+  
+  # Default resources (can be overridden by profiles)
+  cpu:
+    limit: 4
+    guarantee: 1
+  memory:
+    limit: "8G"
+    guarantee: "2G"
+  
+  # Storage configuration
+  storage:
+    type: dynamic
+    dynamic:
+      storageClass: "gp3"
+      storageAccessModes:
+        - "ReadWriteOnce"
+    capacity: "10Gi"
+  
+  # Default environment variables
+  extraEnv:
+    JUPYTER_ENABLE_LAB: "true"
+  
+  # Lifecycle hooks for cleanup
+  lifecycleHooks:
+    postStart:
+      exec:
+        command:
+          - "/bin/sh"
+          - "-c"
+          - |
+            # Install common packages
+            pip install --no-cache-dir boto3 pandas numpy scikit-learn matplotlib seaborn
+    preStop:
+      exec:
+        command:
+          - "/bin/sh"
+          - "-c"
+          - |
+            # Sync any unsaved work to S3
+            if [ -d /home/jovyan/s3 ]; then
+              sync
+            fi
+  
+  # Security context
+  allowPrivilegeEscalation: false
+  uid: 1000
+  fsGid: 100
+
+# Scheduling configuration
+scheduling:
+  # User scheduler for better multi-node scheduling
+  userScheduler:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  
+  # Pod priority for user pods
+  userPods:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: hub.jupyter.org/node-purpose
+                operator: In
+                values: ["user"]
+  
+  # Core pods should run on system nodes
+  corePods:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: role
+                operator: In
+                values: ["system"]
+
+# Culling configuration to save costs
+cull:
+  enabled: true
+  timeout: 3600  # 1 hour
+  every: 300     # Check every 5 minutes
+  maxAge: 0      # No maximum age
+
+# Pre-puller to speed up spawning
+prePuller:
+  hook:
+    enabled: true
+  continuous:
+    enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# Enable debug mode for troubleshooting
+debug:
+  enabled: false
+
+# Global configuration
+global:
+  safeToShowValues: false

@@ -1,0 +1,26 @@
+# AWS Region
+region = "us-west-2"
+
+# Cluster Configuration
+cluster_name       = "jupyterhub-eks"
+kubernetes_version = "1.29"
+environment        = "dev"
+
+# VPC Configuration
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-west-2a", "us-west-2b", "us-west-2c"]
+
+# JupyterHub Configuration
+jupyterhub_namespace = "jupyterhub"
+jupyterhub_s3_bucket = ""  # Leave empty to auto-generate
+
+# Node Configuration
+enable_gpu_nodes = true
+
+# Tags
+tags = {
+  Owner       = "DataScience"
+  Environment = "dev"
+  CostCenter  = "ML-Platform"
+  ManagedBy   = "Terraform"
+}
