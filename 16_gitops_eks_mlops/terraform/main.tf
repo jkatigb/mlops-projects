@@ -5,7 +5,6 @@ module "vpc" {
   public_subnets = var.public_subnets
   azs            = var.azs
 }
-}
 
 module "eks" {
   source       = "./modules/eks"
