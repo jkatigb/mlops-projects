@@ -1,0 +1,21 @@
+{{- if .Values.featureStore.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "model-serving.fullname" . }}-feature-store
+  labels:
+    {{- include "model-serving.labels" . | nindent 4 }}
+data:
+  FEATURE_STORE_TYPE: {{ .Values.featureStore.type | quote }}
+  {{- if .Values.featureStore.config.project }}
+  FEATURE_STORE_PROJECT: {{ .Values.featureStore.config.project | quote }}
+  {{- end }}
+  {{- if .Values.featureStore.config.registry }}
+  FEATURE_STORE_REGISTRY: {{ .Values.featureStore.config.registry | quote }}
+  {{- end }}
+  {{- range $key, $value := .Values.featureStore.config }}
+  {{- if and (ne $key "project") (ne $key "registry") }}
+  FEATURE_STORE_{{ $key | upper }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}

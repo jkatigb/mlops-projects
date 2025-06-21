@@ -1,0 +1,177 @@
+# Example values for a GPU-enabled PyTorch model serving deployment
+
+## Image configuration
+image:
+  repository: myregistry/llm-inference
+  tag: "v2.0.0"
+  pullPolicy: IfNotPresent
+
+## Service configuration
+service:
+  type: ClusterIP  # Using Ingress for external access
+  port: 80
+  targetPort: 8080
+
+## Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: llm-api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+## GPU configuration
+gpu:
+  enabled: true
+  type: nvidia
+  count: 1
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+    node.kubernetes.io/instance-type: "p3.2xlarge"  # AWS GPU instance
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: gpu-workload
+      operator: Equal
+      value: "ml-inference"
+      effect: NoSchedule
+
+## Resource configuration
+resources:
+  limits:
+    cpu: 8000m
+    memory: 32Gi
+    nvidia.com/gpu: 1
+  requests:
+    cpu: 4000m
+    memory: 16Gi
+    nvidia.com/gpu: 1
+
+## Limited replicas for GPU workloads
+replicaCount: 1
+
+## Autoscaling based on GPU metrics
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 60
+  # Custom GPU utilization metric
+  customMetrics:
+    - type: Pods
+      pods:
+        metric:
+          name: gpu_utilization_percentage
+        target:
+          type: AverageValue
+          averageValue: "70"
+
+## Health checks with longer timeouts for model loading
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /startup
+    port: http
+  initialDelaySeconds: 0
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 20  # 10 minutes for model loading
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 600  # After startup probe
+  periodSeconds: 30
+  timeoutSeconds: 10
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+
+## Environment variables
+env:
+  - name: MODEL_NAME
+    value: "llama-7b"
+  - name: CUDA_VISIBLE_DEVICES
+    value: "0"
+  - name: PYTORCH_CUDA_ALLOC_CONF
+    value: "max_split_size_mb:512"
+  - name: MODEL_CACHE_DIR
+    value: "/model-cache"
+  - name: BATCH_SIZE
+    value: "8"
+  - name: MAX_SEQUENCE_LENGTH
+    value: "2048"
+
+## Volume for model cache
+volumeMounts:
+  - name: model-cache
+    mountPath: /model-cache
+  - name: shm
+    mountPath: /dev/shm
+
+volumes:
+  - name: model-cache
+    persistentVolumeClaim:
+      claimName: model-cache-pvc
+  - name: shm
+    emptyDir:
+      medium: Memory
+      sizeLimit: 16Gi
+
+## Model configuration
+model:
+  type: pytorch
+  version: "2.0.0"
+  loading:
+    timeout: 600  # 10 minutes for large models
+    retries: 2
+  inference:
+    batchSize: 8
+    timeout: 60
+    maxConcurrent: 10  # Limited due to GPU memory
+
+## Node affinity for GPU nodes
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+          - p3.2xlarge
+          - p3.8xlarge
+          - p3.16xlarge
+
+## Monitoring with GPU metrics
+monitoring:
+  enabled: true
+  prometheus:
+    scrape: true
+    port: 9090
+    path: /metrics
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    labels:
+      release: prometheus-operator
+    # Additional GPU metrics
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '(nvidia_gpu_.*|cuda_.*)'
+      action: keep

@@ -3,37 +3,146 @@ kind: Deployment
 metadata:
   name: {{ include "model-serving.fullname" . }}
   labels:
-    app.kubernetes.io/name: {{ include "model-serving.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "model-serving.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "model-serving.name" . }}
-      app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- include "model-serving.selectorLabels" . | nindent 6 }}
+  {{- with .Values.updateStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   template:
     metadata:
-      labels:
-        app.kubernetes.io/name: {{ include "model-serving.name" . }}
-        app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
-        {{- if .Values.prometheus.scrape }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.monitoring.prometheus.scrape }}
         prometheus.io/scrape: "true"
-        prometheus.io/port: {{ .Values.prometheus.port | quote }}
+        prometheus.io/port: {{ .Values.monitoring.prometheus.port | quote }}
+        prometheus.io/path: {{ .Values.monitoring.prometheus.path | quote }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "model-serving.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "model-serving.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
       containers:
-        - name: app
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: 80
-              name: http
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+            {{- if .Values.monitoring.prometheus.scrape }}
+            - name: metrics
+              containerPort: {{ .Values.monitoring.prometheus.port }}
+              protocol: TCP
+            {{- end }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+            {{- if not .Values.livenessProbe.httpGet }}
+            httpGet:
+              path: /health
+              port: http
+            {{- end }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+            {{- if not .Values.readinessProbe.httpGet }}
+            httpGet:
+              path: /ready
+              port: http
+            {{- end }}
+          {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            {{- toYaml .Values.startupProbe | nindent 12 }}
+            {{- if not .Values.startupProbe.httpGet }}
+            httpGet:
+              path: /startup
+              port: http
+            {{- end }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      {{- if .Values.gpu.enabled }}
+            {{- if .Values.gpu.enabled }}
+            {{- with .Values.gpu.resources }}
+            {{- toYaml . | nindent 12 }}
+            {{- else }}
+            limits:
+              {{- if eq .Values.gpu.type "nvidia" }}
+              nvidia.com/gpu: {{ .Values.gpu.count | quote }}
+              {{- else if eq .Values.gpu.type "amd" }}
+              amd.com/gpu: {{ .Values.gpu.count | quote }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+          {{- with .Values.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if or .Values.envFrom .Values.model.registry.enabled .Values.featureStore.enabled }}
+          envFrom:
+            {{- with .Values.envFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- if .Values.model.registry.enabled }}
+            - secretRef:
+                name: {{ include "model-serving.fullname" . }}-registry
+            {{- end }}
+            {{- if .Values.featureStore.enabled }}
+            - configMapRef:
+                name: {{ include "model-serving.fullname" . }}-feature-store
+            {{- end }}
+          {{- end }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or .Values.nodeSelector .Values.gpu.enabled }}
       nodeSelector:
-        {{- toYaml .Values.gpu.nodeSelector | nindent 8 }}
+        {{- with .Values.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.gpu.enabled }}
+        {{- with .Values.gpu.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if or .Values.tolerations .Values.gpu.enabled }}
       tolerations:
-        {{- toYaml .Values.gpu.tolerations | nindent 8 }}
+        {{- with .Values.tolerations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.gpu.enabled }}
+        {{- with .Values.gpu.tolerations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
       {{- end }}

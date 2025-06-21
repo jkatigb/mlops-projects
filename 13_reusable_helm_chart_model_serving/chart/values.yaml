@@ -1,34 +1,288 @@
+# Default values for model-serving chart
+
+## Global settings
+replicaCount: 1
+nameOverride: ""
+fullnameOverride: ""
+
+## Image configuration
 image:
   repository: myregistry/my-model
   tag: "latest"
   pullPolicy: IfNotPresent
+  # pullSecrets:
+  #   - name: regcred
 
+## Service configuration
 service:
   type: ClusterIP
+  port: 80
+  targetPort: 8080
+  # nodePort: 30080  # Only for NodePort
+  annotations: {}
+  # loadBalancerIP: ""  # Only for LoadBalancer
+  # externalTrafficPolicy: Cluster  # Cluster or Local
 
+## Ingress configuration
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+    # kubernetes.io/tls-acme: "true"
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # nginx.ingress.kubernetes.io/rate-limit: "100"
+  hosts:
+    - host: model.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: model-tls
+  #    hosts:
+  #      - model.example.com
+
+## Resource configuration
 resources:
   limits:
-    cpu: 500m
-    memory: 512Mi
+    cpu: 1000m
+    memory: 1Gi
   requests:
     cpu: 100m
-    memory: 128Mi
+    memory: 256Mi
 
+## GPU support
 gpu:
   enabled: false
+  type: nvidia  # nvidia or amd
+  count: 1
   nodeSelector:
     nvidia.com/gpu.present: "true"
   tolerations:
     - key: nvidia.com/gpu
       operator: Exists
       effect: NoSchedule
+  # resources:
+  #   limits:
+  #     nvidia.com/gpu: 1
 
+## Horizontal Pod Autoscaler
 autoscaling:
   enabled: true
   minReplicas: 1
-  maxReplicas: 3
-  targetCPU: 80
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+  # Custom metrics for model-specific scaling
+  # customMetrics:
+  #   - type: Pods
+  #     pods:
+  #       metric:
+  #         name: inference_requests_per_second
+  #       target:
+  #         type: AverageValue
+  #         averageValue: 100
 
-prometheus:
-  scrape: true
-  port: http
+## Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1
+
+## Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+  # AWS IRSA annotation example:
+  # eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/my-model-role
+
+## Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 2000
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+## Liveness and Readiness Probes
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+## Startup Probe for slow-starting models
+startupProbe:
+  enabled: false
+  httpGet:
+    path: /startup
+    port: http
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+
+## Environment variables
+env: []
+  # - name: MODEL_NAME
+  #   value: "my-model"
+  # - name: LOG_LEVEL
+  #   value: "INFO"
+
+envFrom: []
+  # - configMapRef:
+  #     name: model-config
+  # - secretRef:
+  #     name: model-secrets
+
+## Volume mounts
+volumeMounts: []
+  # - name: model-storage
+  #   mountPath: /models
+  # - name: cache
+  #   mountPath: /tmp/cache
+
+volumes: []
+  # - name: model-storage
+  #   persistentVolumeClaim:
+  #     claimName: model-pvc
+  # - name: cache
+  #   emptyDir:
+  #     sizeLimit: 1Gi
+
+## Node selection
+nodeSelector: {}
+  # disktype: ssd
+
+tolerations: []
+
+affinity: {}
+  # podAntiAffinity:
+  #   preferredDuringSchedulingIgnoredDuringExecution:
+  #   - weight: 100
+  #     podAffinityTerm:
+  #       labelSelector:
+  #         matchExpressions:
+  #         - key: app.kubernetes.io/name
+  #           operator: In
+  #           values:
+  #           - model-serving
+  #       topologyKey: kubernetes.io/hostname
+
+## Pod management policy
+podManagementPolicy: Parallel
+
+## Update strategy
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+## Prometheus monitoring
+monitoring:
+  enabled: true
+  prometheus:
+    scrape: true
+    port: 9090
+    path: /metrics
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+    # release: prometheus-operator
+
+## Model-specific configuration
+model:
+  # Model type for specialized handling
+  type: generic  # generic, tensorflow, pytorch, sklearn, xgboost
+  
+  # Model loading configuration
+  loading:
+    timeout: 300  # seconds
+    retries: 3
+    
+  # Inference configuration  
+  inference:
+    batchSize: 32
+    timeout: 30  # seconds
+    maxConcurrent: 100
+    
+  # Model versioning
+  version: "1.0.0"
+  
+  # Model registry integration
+  registry:
+    enabled: false
+    type: mlflow  # mlflow, seldon, bentoml
+    uri: ""
+    credentials:
+      secret: ""
+      
+## Feature store integration
+featureStore:
+  enabled: false
+  type: feast  # feast, tecton, hopsworks
+  config:
+    project: ""
+    registry: ""
+    
+## Canary deployment configuration
+canary:
+  enabled: false
+  weight: 0  # Percentage of traffic to canary
+  analysis:
+    enabled: false
+    interval: 30s
+    threshold: 5
+    maxFailures: 3
+    metrics:
+      - name: success-rate
+        threshold: 95
+      - name: latency-p99
+        threshold: 1000  # milliseconds
+        
+## Network policies
+networkPolicy:
+  enabled: false
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: default
+  egress:
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: default
+    - to:
+      - namespaceSelector: {}
+        podSelector:
+          matchLabels:
+            app: prometheus
+
+## Additional annotations
+podAnnotations: {}
+  # cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+## Additional labels
+podLabels: {}
+  # environment: production
+  # team: ml-platform
